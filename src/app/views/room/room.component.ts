@@ -5,14 +5,19 @@ import axios from 'axios';
 import * as DetectRTC from 'detectrtc';
 import { io } from 'socket.io-client';
 import tippy from 'tippy.js';
+import{Pickr} from 'pickr';
 import { LocalstorageService } from '../../service-front/localstorage.service';
 import { TranscriptionService } from '../../service-front/transcription.service';
+import { RulesService } from '../../service-front/rules.service';
+import { VideogridService } from '../../service-front/videogrid.service';
+import qs from 'qs';
 @Component({
   selector: 'app-room',
   templateUrl: './room.component.html',
   styleUrls: ['./room.component.css']
 })
 export class RoomComponent implements OnInit,OnDestroy {
+
    private localAudioEl: any;
    private remoteAudioEl: any;
    private videoMediaContainer: any;
@@ -111,6 +116,9 @@ export class RoomComponent implements OnInit,OnDestroy {
  private   producerLabel: Map<any, any>;
  private   eventListeners: Map<any, any>;
  private   debug: boolean;
+   // Media
+   private sinkId = 'sinkId' in HTMLMediaElement.prototype;
+ 
     getId(arg0: string) {
         throw new Error('Method not implemented.');
     }
@@ -118,14 +126,7 @@ export class RoomComponent implements OnInit,OnDestroy {
     ngOnDestroy(): void {
         throw new Error('Method not implemented.');
     }
-  ngOnInit(): void {
-    this.isScreenShareSupported =  navigator.getDisplayMedia || (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
-    this.transcriptionService.resizeVideoMedia();
-    this.transcriptionService.resizeMainButtons();
 
-    // Adding window resize event listener
-    window.addEventListener('resize', this.onWindowResize.bind(this));
-  }
   const socket = io({ transports: ['websocket'] });
 
  survey = {
@@ -138,10 +139,10 @@ export class RoomComponent implements OnInit,OnDestroy {
     url: '/newroom',
  };
 
-const recCodecs = null;
-const recPrioritizeH264 = false;
+    const recCodecs = null;
+    const recPrioritizeH264 = false;
 
-const _PEER = {
+    const _PEER = {
     presenter: '<i class="fa-solid fa-user-shield"></i>',
     guest: '<i class="fa-solid fa-signal"></i>',
     audioOn: '<i class="fas fa-microphone"></i>',
@@ -159,1962 +160,1950 @@ const _PEER = {
     sendFile: '<i class="fas fa-upload"></i>',
     sendMsg: '<i class="fas fa-paper-plane"></i>',
     sendVideo: '<i class="fab fa-youtube"></i>',
-};
+    };
 
-const initUser = document.getElementById('initUser');
-const initVideoContainerClass = document.querySelector('.init-video-container');
-const bars = document.querySelectorAll('.volume-bar');
+    const initUser = document.getElementById('initUser');
+    const initVideoContainerClass = document.querySelector('.init-video-container');
+    const bars = document.querySelectorAll('.volume-bar');
 
-const userAgent = navigator.userAgent.toLowerCase();
-const isTabletDevice = isTablet(this.userAgent);
-const isIPadDevice = isIpad(this.userAgent);
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isTabletDevice = isTablet(this.userAgent);
+  const isIPadDevice = isIpad(this.userAgent);
+  
+  const Base64Prefix = 'data:application/pdf;base64,';
+  
+  const wbImageInput = 'image/*';
+  const wbPdfInput = 'application/pdf';
+  const wbWidth = 1200;
+  const wbHeight = 600;
+  
+  const swalImageUrl = '../images/pricing-illustration.svg';
+  
 
-const Base64Prefix = 'data:application/pdf;base64,';
+  
+  // ####################################################
+  // LOCAL STORAGE
+  // ####################################################
+  
+ const  lS =  this.LocalstorageService;
+  
+  const localStorageSettings = this.lS.getLocalStorageSettings() || this.lS.SFU_SETTINGS;
+  
+  const localStorageDevices = this.lS.getLocalStorageDevices() || this.lS.LOCAL_STORAGE_DEVICES;
+  
+  const localStorageInitConfig = this.lS.getLocalStorageInitConfig() || this.lS.INIT_CONFIG;
+  
+  
+  
+  // ####################################################
+  // THEME CUSTOM COLOR - PICKER
+  // ####################################################
+  
+   private themeCustom = {
+      input: document.getElementById('themeColorPicker'),
+      color: this.localStorageSettings.theme_color ? this.localStorageSettings.theme_color : '#000000',
+      keep: this.localStorageSettings.theme_custom ? this.localStorageSettings.theme_custom : false,
+  };
+  
+  const pickr = Pickr.create({
+      el: this.themeCustom.input,
+      theme: 'classic', // or 'monolith', or 'nano'
+      default: this.themeCustom.color,
+      useAsButton: true,
+  
+      swatches: [
+          'rgba(244, 67, 54, 1)',
+          'rgba(233, 30, 99, 0.95)',
+          'rgba(156, 39, 176, 0.9)',
+          'rgba(103, 58, 183, 0.85)',
+          'rgba(63, 81, 181, 0.8)',
+          'rgba(33, 150, 243, 0.75)',
+          'rgba(3, 169, 244, 0.7)',
+          'rgba(0, 188, 212, 0.7)',
+          'rgba(0, 150, 136, 0.75)',
+          'rgba(76, 175, 80, 0.8)',
+          'rgba(139, 195, 74, 0.85)',
+          'rgba(205, 220, 57, 0.9)',
+          'rgba(255, 235, 59, 0.95)',
+          'rgba(255, 193, 7, 1)',
+      ],
+  
+      components: {
+          // Main components
+          preview: true,
+          opacity: true,
+          hue: true,
+  
+          // Input / output Options
+          interaction: {
+              hex: false,
+              rgba: false,
+              hsla: false,
+              hsva: false,
+              cmyk: false,
+              input: false,
+              clear: false,
+              save: false,
+          },
+      },
+  })
+      .on('init', (pickr) => {
+          this.themeCustom.input.value = pickr.getSelectedColor().toHEXA().toString(0);
+      })
+      .on('change', (color) => {
+          this.themeCustom.color = color.toHEXA().toString();
+          this.themeCustom.input.value = this.themeCustom.color;
+          setCustomTheme();
+      })
+      .on('changestop', () => {
+          this.localStorageSettings.theme_color = this.themeCustom.color;
+          this.lS.setSettings(this.localStorageSettings);
+      });
+  
+  // ####################################################
+  // ENUMERATE DEVICES SELECTS
+  // ####################################################
+  
+  private videoSelect = this.getId('videoSelect');
+  private initVideoSelect =this.getId('initVideoSelect');
+  private microphoneSelect =this.getId('microphoneSelect');
+  private initMicrophoneSelect = this.getId('initMicrophoneSelect');
+  private speakerSelect = this.getId('speakerSelect');
+  private initSpeakerSelect = this.getId('initSpeakerSelect');
+  
+  // ####################################################
+  // DYNAMIC SETTINGS
+  // ####################################################
+  
+  private swalBackground = 'radial-gradient(#393939, #000000)'; //'rgba(0, 0, 0, 0.7)';
+  private rc = null;
+  private producer = null;
+  private participantsCount = 0;
+  private lobbyParticipantsCount = 0;
+  private chatMessagesId = 0;
+  private room_id = getRoomId();
+  private room_password = getRoomPassword();
+  private peer_name = getPeerName();
+  private peer_uuid = getPeerUUID();
+  private peer_token = getPeerToken();
+  private isScreenAllowed = getScreen();
+  private isHideMeActive = getHideMeActive();
+  private notify = getNotify();
+  private isPresenter = isPeerPresenter();
+  
+   private peer_info = null;
+  private isPushToTalkActive = false;
+  private isSpaceDown = false;
+  private isPitchBarEnabled = true;
+  private isSoundEnabled = true;
+  private isBroadcastingEnabled = false;
+  private isLobbyEnabled = false;
+  private isLobbyOpen = false;
+  private hostOnlyRecording = false;
+  private isEnumerateAudioDevices = false;
+  private isEnumerateVideoDevices = false;
+  private isAudioAllowed = false;
+  private isVideoAllowed = false;
+  private isVideoPrivacyActive = false;
+  private isRecording = false;
+  private isAudioVideoAllowed = false;
+  private isParticipantsListOpen = false;
+  private isVideoControlsOn = false;
+  private isChatPasteTxt = false;
+  private isChatMarkdownOn = false;
+  private isChatGPTOn = false;
+  private isSpeechSynthesisSupported = 'speechSynthesis' in window;
+  private joinRoomWithoutAudioVideo = true;
+  private joinRoomWithScreen = false;
+  private recTimer = null;
+  private recElapsedTime = null;
+  
+  private wbCanvas = null;
+  private wbIsLock = false;
+  private wbIsDrawing = false;
+  private wbIsOpen = false;
+  private wbIsRedoing = false;
+  private wbIsEraser = false;
+  private wbIsBgTransparent = false;
+  private wbPop = [];
+  private coords = {};
+  private isButtonsVisible = false;
+  private isButtonsBarOver = false;
+  private isRoomLocked = false;
+  private initStream = null;
+  private scriptProcessor = null;
+  private RoomURL = window.location.origin + '/join/' + this.room_id; // window.location.origin + '/join/?room=' + roomId + '&token=' + myToken
+  private transcription: any;
+   private showFreeAvatars = true;
+  const cfg = {
+    useAvatarSvg: true,
+  };
+  
+  private html = {
+    newline: '\n', //'<br />',
+    hideMeOn: 'fas fa-user-slash',
+    hideMeOff: 'fas fa-user',
+    audioOn: 'fas fa-microphone',
+    audioOff: 'fas fa-microphone-slash',
+    videoOn: 'fas fa-video',
+    videoOff: 'fas fa-video-slash',
+    userName: 'username',
+    userHand: 'fas fa-hand-paper pulsate',
+    pip: 'fas fa-images',
+    fullScreen: 'fas fa-expand',
+    snapshot: 'fas fa-camera-retro',
+    sendFile: 'fas fa-upload',
+    sendMsg: 'fas fa-paper-plane',
+    sendVideo: 'fab fa-youtube',
+    geolocation: 'fas fa-location-dot',
+    ban: 'fas fa-ban',
+    kickOut: 'fas fa-times',
+    ghost: 'fas fa-ghost',
+    undo: 'fas fa-undo',
+    bg: 'fas fa-circle-half-stroke',
+    pin: 'fas fa-map-pin',
+    videoPrivacy: 'far fa-circle',
+    expand: 'fas fa-ellipsis-vertical',
+  };
 
-const wbImageInput = 'image/*';
-const wbPdfInput = 'application/pdf';
-const wbWidth = 1200;
-const wbHeight = 600;
-
-const swalImageUrl = '../images/pricing-illustration.svg';
-
-// Media
-const sinkId = 'sinkId' in HTMLMediaElement.prototype;
-
-// ####################################################
-// LOCAL STORAGE
-// ####################################################
-
- lS = new this.LocalstorageService();
-
-const localStorageSettings = this.lS.getLocalStorageSettings() || this.lS.SFU_SETTINGS;
-
-const localStorageDevices = this.lS.getLocalStorageDevices() || this.lS.LOCAL_STORAGE_DEVICES;
-
-const localStorageInitConfig = this.lS.getLocalStorageInitConfig() || this.lS.INIT_CONFIG;
-
-
-
-// ####################################################
-// THEME CUSTOM COLOR - PICKER
-// ####################################################
-
- const themeCustom = {
-    input: document.getElementById('themeColorPicker'),
-    color: this.localStorageSettings.theme_color ? this.localStorageSettings.theme_color : '#000000',
-    keep: this.localStorageSettings.theme_custom ? this.localStorageSettings.theme_custom : false,
-};
-
-const pickr = Pickr.create({
-    el: this.themeCustom.input,
-    theme: 'classic', // or 'monolith', or 'nano'
-    default: this.themeCustom.color,
-    useAsButton: true,
-
-    swatches: [
-        'rgba(244, 67, 54, 1)',
-        'rgba(233, 30, 99, 0.95)',
-        'rgba(156, 39, 176, 0.9)',
-        'rgba(103, 58, 183, 0.85)',
-        'rgba(63, 81, 181, 0.8)',
-        'rgba(33, 150, 243, 0.75)',
-        'rgba(3, 169, 244, 0.7)',
-        'rgba(0, 188, 212, 0.7)',
-        'rgba(0, 150, 136, 0.75)',
-        'rgba(76, 175, 80, 0.8)',
-        'rgba(139, 195, 74, 0.85)',
-        'rgba(205, 220, 57, 0.9)',
-        'rgba(255, 235, 59, 0.95)',
-        'rgba(255, 193, 7, 1)',
-    ],
-
-    components: {
-        // Main components
-        preview: true,
-        opacity: true,
-        hue: true,
-
-        // Input / output Options
-        interaction: {
-            hex: false,
-            rgba: false,
-            hsla: false,
-            hsva: false,
-            cmyk: false,
-            input: false,
-            clear: false,
-            save: false,
-        },
+  
+  private icons = {
+      image = {
+    about: '../assets/images/mirotalk-logo.gif',
+    avatar: '../assets/images/mirotalksfu-logo.png',
+    audio: '../assets/images/audio.gif',
+    poster: '../assets/images/loader.gif',
+    rec: '../assets/images/rec.png',
+    recording: '../assets/images/recording.png',
+    delete: '../assets/images/delete.png',
+    locked: '../assets/images/locked.png',
+    mute: '../assets/images/mute.png',
+    hide: '../assets/images/hide.png',
+    stop: '../assets/images/stop.png',
+    unmute: '../assets/images/unmute.png',
+    unhide: '../assets/images/unhide.png',
+    start: '../assets/images/start.png',
+    users: '../assets/images/participants.png',
+    user: '../assets/images/participant.png',
+    username: '../assets/images/user.png',
+    videoShare: '../assets/images/video-share.png',
+    message: '../assets/images/message.png',
+    share: '../assets/images/share.png',
+    exit: '../assets/images/exit.png',
+    feedback: '../assets/images/feedback.png',
+    lobby: '../assets/images/lobby.png',
+    email: '../assets/images/email.png',
+    chatgpt: '../assets/images/chatgpt.png',
+    all: '../assets/images/all.png',
+    forbidden: '../assets/images/forbidden.png',
+    broadcasting: '../assets/images/broadcasting.png',
+    geolocation: '../assets/images/geolocation.png',
+    network: '../assets/images/network.gif',
+  }};
+  
+  private mediaType = {
+    audio: 'audioType',
+    audioTab: 'audioTab',
+    video: 'videoType',
+    camera: 'cameraType',
+    screen: 'screenType',
+    speaker: 'speakerType',
+  };
+  
+  const _EVENTS = {
+    openRoom: 'openRoom',
+    exitRoom: 'exitRoom',
+    startRec: 'startRec',
+    pauseRec: 'pauseRec',
+    resumeRec: 'resumeRec',
+    stopRec: 'stopRec',
+    raiseHand: 'raiseHand',
+    lowerHand: 'lowerHand',
+    startVideo: 'startVideo',
+    pauseVideo: 'pauseVideo',
+    resumeVideo: 'resumeVideo',
+    stopVideo: 'stopVideo',
+    startAudio: 'startAudio',
+    pauseAudio: 'pauseAudio',
+    resumeAudio: 'resumeAudio',
+    stopAudio: 'stopAudio',
+    startScreen: 'startScreen',
+    pauseScreen: 'pauseScreen',
+    resumeScreen: 'resumeScreen',
+    stopScreen: 'stopScreen',
+    roomLock: 'roomLock',
+    lobbyOn: 'lobbyOn',
+    lobbyOff: 'lobbyOff',
+    roomUnlock: 'roomUnlock',
+    hostOnlyRecordingOn: 'hostOnlyRecordingOn',
+    hostOnlyRecordingOff: 'hostOnlyRecordingOff',
+  };
+  
+  // Enums
+  const enums = {
+    recording: {
+        started: 'Started conference recording',
+        start: 'Start conference recording',
+        stop: 'Stop conference recording',
     },
-})
-    .on('init', (pickr) => {
-        this.themeCustom.input.value = pickr.getSelectedColor().toHEXA().toString(0);
-    })
-    .on('change', (color) => {
-        this.themeCustom.color = color.toHEXA().toString();
-        this.themeCustom.input.value = this.themeCustom.color;
-        setCustomTheme();
-    })
-    .on('changestop', () => {
-        this.localStorageSettings.theme_color = this.themeCustom.color;
-        this.lS.setSettings(this.localStorageSettings);
-    });
-
-// ####################################################
-// ENUMERATE DEVICES SELECTS
-// ####################################################
-
-private videoSelect = this.getId('videoSelect');
-private initVideoSelect =this.getId('initVideoSelect');
-private microphoneSelect =this.getId('microphoneSelect');
-private initMicrophoneSelect = this.getId('initMicrophoneSelect');
-private speakerSelect = this.getId('speakerSelect');
-private initSpeakerSelect = this.getId('initSpeakerSelect');
-
-// ####################################################
-// DYNAMIC SETTINGS
-// ####################################################
-
-private swalBackground = 'radial-gradient(#393939, #000000)'; //'rgba(0, 0, 0, 0.7)';
-private rc = null;
-private producer = null;
-private participantsCount = 0;
-private lobbyParticipantsCount = 0;
-private chatMessagesId = 0;
-private room_id = getRoomId();
-private room_password = getRoomPassword();
-private peer_name = getPeerName();
-private peer_uuid = getPeerUUID();
-private peer_token = getPeerToken();
-private isScreenAllowed = getScreen();
-private isHideMeActive = getHideMeActive();
-private notify = getNotify();
-private isPresenter = isPeerPresenter();
-
- private peer_info = null;
-private isPushToTalkActive = false;
-private isSpaceDown = false;
-private isPitchBarEnabled = true;
-private isSoundEnabled = true;
-private isBroadcastingEnabled = false;
-private isLobbyEnabled = false;
-private isLobbyOpen = false;
-private hostOnlyRecording = false;
-private isEnumerateAudioDevices = false;
-private isEnumerateVideoDevices = false;
-private isAudioAllowed = false;
-private isVideoAllowed = false;
-private isVideoPrivacyActive = false;
-private isRecording = false;
-private isAudioVideoAllowed = false;
-private isParticipantsListOpen = false;
-private isVideoControlsOn = false;
-private isChatPasteTxt = false;
-private isChatMarkdownOn = false;
-private isChatGPTOn = false;
-private isSpeechSynthesisSupported = 'speechSynthesis' in window;
-private joinRoomWithoutAudioVideo = true;
-private joinRoomWithScreen = false;
-private recTimer = null;
-private recElapsedTime = null;
-
-private wbCanvas = null;
-private wbIsLock = false;
-private wbIsDrawing = false;
-private wbIsOpen = false;
-private wbIsRedoing = false;
-private wbIsEraser = false;
-private wbIsBgTransparent = false;
-private wbPop = [];
-private coords = {};
-private isButtonsVisible = false;
-private isButtonsBarOver = false;
-private isRoomLocked = false;
-private initStream = null;
-private scriptProcessor = null;
-private RoomURL = window.location.origin + '/join/' + this.room_id; // window.location.origin + '/join/?room=' + roomId + '&token=' + myToken
-private transcription: any;
- private showFreeAvatars = true;
-const cfg = {
-  useAvatarSvg: true,
-};
-
-private html = {
-  newline: '\n', //'<br />',
-  hideMeOn: 'fas fa-user-slash',
-  hideMeOff: 'fas fa-user',
-  audioOn: 'fas fa-microphone',
-  audioOff: 'fas fa-microphone-slash',
-  videoOn: 'fas fa-video',
-  videoOff: 'fas fa-video-slash',
-  userName: 'username',
-  userHand: 'fas fa-hand-paper pulsate',
-  pip: 'fas fa-images',
-  fullScreen: 'fas fa-expand',
-  snapshot: 'fas fa-camera-retro',
-  sendFile: 'fas fa-upload',
-  sendMsg: 'fas fa-paper-plane',
-  sendVideo: 'fab fa-youtube',
-  geolocation: 'fas fa-location-dot',
-  ban: 'fas fa-ban',
-  kickOut: 'fas fa-times',
-  ghost: 'fas fa-ghost',
-  undo: 'fas fa-undo',
-  bg: 'fas fa-circle-half-stroke',
-  pin: 'fas fa-map-pin',
-  videoPrivacy: 'far fa-circle',
-  expand: 'fas fa-ellipsis-vertical',
-};
-
-private icons = {
-  room: '<i class="fas fa-home"></i>',
-  chat: '<i class="fas fa-comments"></i>',
-  user: '<i class="fas fa-user"></i>',
-  transcript: '<i class="fas fa-closed-captioning"></i>',
-  speech: '<i class="fas fa-volume-high"></i>',
-  share: '<i class="fas fa-share-alt"></i>',
-  ptt: '<i class="fa-solid fa-hand-pointer"></i>',
-  lobby: '<i class="fas fa-shield-halved"></i>',
-  lock: '<i class="fa-solid fa-lock"></i>',
-  unlock: '<i class="fa-solid fa-lock-open"></i>',
-  pitchBar: '<i class="fas fa-microphone-lines"></i>',
-  sounds: '<i class="fas fa-music"></i>',
-  fileSend: '<i class="fa-solid fa-file-export"></i>',
-  fileReceive: '<i class="fa-solid fa-file-import"></i>',
-  recording: '<i class="fas fa-record-vinyl"></i>',
-  moderator: '<i class="fas fa-m"></i>',
-  broadcaster: '<i class="fa-solid fa-wifi"></i>',
-  codecs: '<i class="fa-solid fa-film"></i>',
-  theme: '<i class="fas fa-fill-drip"></i>',
-  recSync: '<i class="fa-solid fa-cloud-arrow-up"></i>',
-  refresh: '<i class="fas fa-rotate"></i>',
-};
-
-private icons = {
-    image = {
-  about: '../assets/images/mirotalk-logo.gif',
-  avatar: '../assets/images/mirotalksfu-logo.png',
-  audio: '../assets/images/audio.gif',
-  poster: '../assets/images/loader.gif',
-  rec: '../assets/images/rec.png',
-  recording: '../assets/images/recording.png',
-  delete: '../assets/images/delete.png',
-  locked: '../assets/images/locked.png',
-  mute: '../assets/images/mute.png',
-  hide: '../assets/images/hide.png',
-  stop: '../assets/images/stop.png',
-  unmute: '../assets/images/unmute.png',
-  unhide: '../assets/images/unhide.png',
-  start: '../assets/images/start.png',
-  users: '../assets/images/participants.png',
-  user: '../assets/images/participant.png',
-  username: '../assets/images/user.png',
-  videoShare: '../assets/images/video-share.png',
-  message: '../assets/images/message.png',
-  share: '../assets/images/share.png',
-  exit: '../assets/images/exit.png',
-  feedback: '../assets/images/feedback.png',
-  lobby: '../assets/images/lobby.png',
-  email: '../assets/images/email.png',
-  chatgpt: '../assets/images/chatgpt.png',
-  all: '../assets/images/all.png',
-  forbidden: '../assets/images/forbidden.png',
-  broadcasting: '../assets/images/broadcasting.png',
-  geolocation: '../assets/images/geolocation.png',
-  network: '../assets/images/network.gif',
-}};
-
-private mediaType = {
-  audio: 'audioType',
-  audioTab: 'audioTab',
-  video: 'videoType',
-  camera: 'cameraType',
-  screen: 'screenType',
-  speaker: 'speakerType',
-};
-
-const _EVENTS = {
-  openRoom: 'openRoom',
-  exitRoom: 'exitRoom',
-  startRec: 'startRec',
-  pauseRec: 'pauseRec',
-  resumeRec: 'resumeRec',
-  stopRec: 'stopRec',
-  raiseHand: 'raiseHand',
-  lowerHand: 'lowerHand',
-  startVideo: 'startVideo',
-  pauseVideo: 'pauseVideo',
-  resumeVideo: 'resumeVideo',
-  stopVideo: 'stopVideo',
-  startAudio: 'startAudio',
-  pauseAudio: 'pauseAudio',
-  resumeAudio: 'resumeAudio',
-  stopAudio: 'stopAudio',
-  startScreen: 'startScreen',
-  pauseScreen: 'pauseScreen',
-  resumeScreen: 'resumeScreen',
-  stopScreen: 'stopScreen',
-  roomLock: 'roomLock',
-  lobbyOn: 'lobbyOn',
-  lobbyOff: 'lobbyOff',
-  roomUnlock: 'roomUnlock',
-  hostOnlyRecordingOn: 'hostOnlyRecordingOn',
-  hostOnlyRecordingOff: 'hostOnlyRecordingOff',
-};
-
-// Enums
-const enums = {
-  recording: {
-      started: 'Started conference recording',
-      start: 'Start conference recording',
-      stop: 'Stop conference recording',
-  },
-  //...
-};
-
-// HeyGen config
-const VideoAI = {
-  enabled: true,
-  active: false,
-  info: {},
-  avatar: null,
-  avatarName: 'Monica',
-  avatarVoice: '',
-  quality: 'medium',
-  virtualBackground: true,
-  background: '../images/virtual/1.jpg',
-};
-
-// Recording
- private recordedBlobs = [];
-
-  constructor(
-    localAudioEl: any,
-    remoteAudioEl: any,
-    videoMediaContainer: any,
-    videoPinMediaContainer: any,
-    mediasoupClient: any,
-    socket: any,
-    room_id: string,
-    peer_name: string,
-    peer_uuid: string,
-    peer_info: any,
-    isAudioAllowed: boolean,
-    isVideoAllowed: boolean,
-    isScreenAllowed: boolean,
-    joinRoomWithScreen: boolean,
-    isSpeechSynthesisSupported: boolean,
-    transcription: any,
-    successCallback: Function,
-    private http: HttpClient,
-    private transcriptionService: TranscriptionService,
-    private LocalstorageService: LocalstorageService
-
-  ) { 
+    //...
+  };
+  
+  // HeyGen config
+  const VideoAI = {
+    enabled: true,
+    active: false,
+    info: {},
+    avatar: null,
+    avatarName: 'Monica',
+    avatarVoice: '',
+    quality: 'medium',
+    virtualBackground: true,
+    background: '../images/virtual/1.jpg',
+  };
+  
+  // Recording
+   private recordedBlobs = [];
+  
+    constructor(
+        private rulesService: RulesService,
+        private LocalstorageService: LocalstorageService,
+       private videogrid:VideogridService,
+      localAudioEl: any,
+      remoteAudioEl: any,
+      videoMediaContainer: any,
+      videoPinMediaContainer: any,
+      mediasoupClient: any,
+      socket: any,
+      room_id: string,
+      peer_name: string,
+      peer_uuid: string,
+      peer_info: any,
+      isAudioAllowed: boolean,
+      isVideoAllowed: boolean,
+      isScreenAllowed: boolean,
+      joinRoomWithScreen: boolean,
+      isSpeechSynthesisSupported: boolean,
+      transcription: any,
+      successCallback: Function,
+      private http: HttpClient,
+      private transcriptionService: TranscriptionService,
     
-    this.localAudioEl =  localAudioEl;
-        this.remoteAudioEl =  remoteAudioEl;
-        this.videoMediaContainer =  videoMediaContainer;
-        this.videoPinMediaContainer =  videoPinMediaContainer;
-        this.mediasoupClient =  mediasoupClient;
+  
+    ) { 
+      
+      this.localAudioEl =  localAudioEl;
+          this.remoteAudioEl =  remoteAudioEl;
+          this.videoMediaContainer =  videoMediaContainer;
+          this.videoPinMediaContainer =  videoPinMediaContainer;
+          this.mediasoupClient =  mediasoupClient;
+  
+          this.socket =  socket;
+          this.room_id = room_id;
+          this.peer_id = socket.id;
+          this.peer_name = peer_name;
+          this.peer_uuid = peer_uuid;
+          this.peer_info = peer_info;
+  
+          // Moderator
+          this._moderator = {
+              audio_start_muted: false,
+              video_start_hidden: false,
+              audio_cant_unmute: false,
+              video_cant_unhide: false,
+              screen_cant_share: false,
+              chat_cant_privately: false,
+              chat_cant_chatgpt: false,
+          };
+  
+          // Chat messages
+          this.chatMessageLengthCheck = false;
+          this.chatMessageLength = 4000; // chars
+          this.chatMessageTimeLast = 0;
+          this.chatMessageTimeBetween = 1000; // ms
+          this.chatMessageNotifyDelay = 10000; // ms
+          this.chatMessageSpamCount = 0;
+          this.chatMessageSpamCountToBan = 10;
+  
+          // HeyGen Video AI
+          this.videoAIContainer = null;
+          this.videoAIElement = null;
+          this.canvasAIElement = null;
+          this.renderAIToken = null;
+          this.peerConnection = null;
+  
+          this.isAudioAllowed = isAudioAllowed;
+          this.isVideoAllowed = isVideoAllowed;
+          this.isScreenAllowed = isScreenAllowed;
+          this.joinRoomWithScreen = joinRoomWithScreen;
+          this.producerTransport = null;
+          this.consumerTransport = null;
+          this.device = null;
+  
+          this.isMobileDevice = DetectRTC.isMobileDevice;
+          this.isScreenShareSupported =
+              navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia ? true : false;
+  
+          this.isMySettingsOpen = false;
+  
+          this._isConnected = false;
+          this.isVideoOnFullScreen = false;
+          this.isVideoFullScreenSupported = this.isFullScreenSupported();
+          this.isVideoPictureInPictureSupported = document.pictureInPictureEnabled;
+          this.isZoomCenterMode = false;
+          this.isChatOpen = false;
+          this.isChatEmojiOpen = false;
+          this.isSpeechSynthesisSupported = isSpeechSynthesisSupported;
+          this.speechInMessages = false;
+          this.showChatOnMessage = true;
+          this.isChatBgTransparent = false;
+          this.isVideoPinned = false;
+          this.isChatPinned = false;
+          this.isChatMaximized = false;
+          this.isToggleUnreadMsg = false;
+          this.isToggleRaiseHand = false;
+          this.pinnedVideoPlayerId = null;
+          this.camVideo = false;
+          this.camera = 'user';
+          this.videoQualitySelectedIndex = 0;
+  
+          this.chatGPTContext = [];
+          this.chatMessages = [];
+          this.leftMsgAvatar = null;
+          this.rightMsgAvatar = null;
+  
+          this.localVideoStream = null;
+          this.localAudioStream = null;
+          this.localScreenStream = null;
+  
+          this.RoomPassword = false;
+  
+          this.transcription = transcription;
+  
+          // File transfer settings
+          this.fileToSend = null;
+          this.fileReader = null;
+          this.receiveBuffer = [];
+          this.receivedSize = 0;
+          this.incomingFileInfo = null;
+          this.incomingFileData = null;
+          this.sendInProgress = false;
+          this.receiveInProgress = false;
+          this.fileSharingInput = '*';
+          this.chunkSize = 1024 * 16; // 16kb/s
+  
+          // Recording
+          this._isRecording = false;
+          this.mediaRecorder = null;
+          this.audioRecorder = null;
+          this.recScreenStream = null;
+          this.recSyncServerRecording = false;
+          this.recSyncTime = 4000; // 4 sec
+          this.recSyncChunkSize = 1000000; // 1MB
+  
+          // Encodings
+          this.forceVP8 = false; // Force VP8 codec for webcam and screen sharing
+          this.forceVP9 = false; // Force VP9 codec for webcam and screen sharing
+          this.forceH264 = false; // Force H264 codec for webcam and screen sharing
+          this.enableWebcamLayers = true; // Enable simulcast or SVC for webcam
+          this.enableSharingLayers = true; // Enable simulcast or SVC for screen sharing
+          this.numSimulcastStreamsWebcam = 3; // Number of streams for simulcast in webcam
+          this.numSimulcastStreamsSharing = 1; // Number of streams for simulcast in screen sharing
+          this.webcamScalabilityMode = 'L3T3'; // Scalability Mode for webcam | 'L1T3' for VP8/H264 (in each simulcast encoding), 'L3T3_KEY' for VP9
+          this.sharingScalabilityMode = 'L1T3'; // Scalability Mode for screen sharing | 'L1T3' for VP8/H264 (in each simulcast encoding), 'L3T3' for VP9
+  
+          this.myVideoEl = null;
+          this.myAudioEl = null;
+          this.showPeerInfo = false; // on peerName mouse hover
+  
+          this.videoProducerId = null;
+          this.screenProducerId = null;
+          this.audioProducerId = null;
+          this.audioConsumers = new Map();
+  
+          this.consumers = new Map();
+          this.producers = new Map();
+          this.producerLabel = new Map();
+          this.eventListeners = new Map();
+  
+          this.debug = false;
+          this.debug ? window.localStorage.setItem('debug', 'mediasoup*') : window.localStorage.removeItem('debug');
+  
+          console.log('06 ----> Load MediaSoup Client v', mediasoupClient.version);
+          console.log('06.1 ----> PEER_ID', this.peer_id);
+  
+          Object.keys(this._EVENTS).forEach((evt) => {
+              this.eventListeners.set(evt, []);
+          });
+  
+          this.socket.request = function request(type: any, data = {}) {
+              return new Promise((resolve, reject) => {
+                  socket.emit(type, data, (data: unknown) => {
+                      if (data.error) {
+                          reject(data.error);
+                      } else {
+                          resolve(data);
+                      }
+                  });
+              });
+          };
+  
+          // ####################################################
+          // CREATE ROOM AND JOIN
+          // ####################################################
+  
+          this.createRoom(this.room_id).then(async () => {
+              const data = {
+                  room_id: this.room_id,
+                  peer_info: this.peer_info,
+              };
+              await this.join(data);
+              this.initSockets();
+              this._isConnected = true;
+              successCallback();
+          });
+      }
 
-        this.socket =  socket;
-        this.room_id = room_id;
-        this.peer_id = socket.id;
-        this.peer_name = peer_name;
-        this.peer_uuid = peer_uuid;
-        this.peer_info = peer_info;
-
-        // Moderator
-        this._moderator = {
-            audio_start_muted: false,
-            video_start_hidden: false,
-            audio_cant_unmute: false,
-            video_cant_unhide: false,
-            screen_cant_share: false,
-            chat_cant_privately: false,
-            chat_cant_chatgpt: false,
-        };
-
-        // Chat messages
-        this.chatMessageLengthCheck = false;
-        this.chatMessageLength = 4000; // chars
-        this.chatMessageTimeLast = 0;
-        this.chatMessageTimeBetween = 1000; // ms
-        this.chatMessageNotifyDelay = 10000; // ms
-        this.chatMessageSpamCount = 0;
-        this.chatMessageSpamCountToBan = 10;
-
-        // HeyGen Video AI
-        this.videoAIContainer = null;
-        this.videoAIElement = null;
-        this.canvasAIElement = null;
-        this.renderAIToken = null;
-        this.peerConnection = null;
-
-        this.isAudioAllowed = isAudioAllowed;
-        this.isVideoAllowed = isVideoAllowed;
-        this.isScreenAllowed = isScreenAllowed;
-        this.joinRoomWithScreen = joinRoomWithScreen;
-        this.producerTransport = null;
-        this.consumerTransport = null;
-        this.device = null;
-
-        this.isMobileDevice = DetectRTC.isMobileDevice;
-        this.isScreenShareSupported =
-            navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia ? true : false;
-
-        this.isMySettingsOpen = false;
-
-        this._isConnected = false;
-        this.isVideoOnFullScreen = false;
-        this.isVideoFullScreenSupported = this.isFullScreenSupported();
-        this.isVideoPictureInPictureSupported = document.pictureInPictureEnabled;
-        this.isZoomCenterMode = false;
-        this.isChatOpen = false;
-        this.isChatEmojiOpen = false;
-        this.isSpeechSynthesisSupported = isSpeechSynthesisSupported;
-        this.speechInMessages = false;
-        this.showChatOnMessage = true;
-        this.isChatBgTransparent = false;
-        this.isVideoPinned = false;
-        this.isChatPinned = false;
-        this.isChatMaximized = false;
-        this.isToggleUnreadMsg = false;
-        this.isToggleRaiseHand = false;
-        this.pinnedVideoPlayerId = null;
-        this.camVideo = false;
-        this.camera = 'user';
-        this.videoQualitySelectedIndex = 0;
-
-        this.chatGPTContext = [];
-        this.chatMessages = [];
-        this.leftMsgAvatar = null;
-        this.rightMsgAvatar = null;
-
-        this.localVideoStream = null;
-        this.localAudioStream = null;
-        this.localScreenStream = null;
-
-        this.RoomPassword = false;
-
-        this.transcription = transcription;
-
-        // File transfer settings
-        this.fileToSend = null;
-        this.fileReader = null;
-        this.receiveBuffer = [];
-        this.receivedSize = 0;
-        this.incomingFileInfo = null;
-        this.incomingFileData = null;
-        this.sendInProgress = false;
-        this.receiveInProgress = false;
-        this.fileSharingInput = '*';
-        this.chunkSize = 1024 * 16; // 16kb/s
-
-        // Recording
-        this._isRecording = false;
-        this.mediaRecorder = null;
-        this.audioRecorder = null;
-        this.recScreenStream = null;
-        this.recSyncServerRecording = false;
-        this.recSyncTime = 4000; // 4 sec
-        this.recSyncChunkSize = 1000000; // 1MB
-
-        // Encodings
-        this.forceVP8 = false; // Force VP8 codec for webcam and screen sharing
-        this.forceVP9 = false; // Force VP9 codec for webcam and screen sharing
-        this.forceH264 = false; // Force H264 codec for webcam and screen sharing
-        this.enableWebcamLayers = true; // Enable simulcast or SVC for webcam
-        this.enableSharingLayers = true; // Enable simulcast or SVC for screen sharing
-        this.numSimulcastStreamsWebcam = 3; // Number of streams for simulcast in webcam
-        this.numSimulcastStreamsSharing = 1; // Number of streams for simulcast in screen sharing
-        this.webcamScalabilityMode = 'L3T3'; // Scalability Mode for webcam | 'L1T3' for VP8/H264 (in each simulcast encoding), 'L3T3_KEY' for VP9
-        this.sharingScalabilityMode = 'L1T3'; // Scalability Mode for screen sharing | 'L1T3' for VP8/H264 (in each simulcast encoding), 'L3T3' for VP9
-
-        this.myVideoEl = null;
-        this.myAudioEl = null;
-        this.showPeerInfo = false; // on peerName mouse hover
-
-        this.videoProducerId = null;
-        this.screenProducerId = null;
-        this.audioProducerId = null;
-        this.audioConsumers = new Map();
-
-        this.consumers = new Map();
-        this.producers = new Map();
-        this.producerLabel = new Map();
-        this.eventListeners = new Map();
-
-        this.debug = false;
-        this.debug ? window.localStorage.setItem('debug', 'mediasoup*') : window.localStorage.removeItem('debug');
-
-        console.log('06 ----> Load MediaSoup Client v', mediasoupClient.version);
-        console.log('06.1 ----> PEER_ID', this.peer_id);
-
-        Object.keys(this._EVENTS).forEach((evt) => {
-            this.eventListeners.set(evt, []);
-        });
-
-        this.socket.request = function request(type: any, data = {}) {
-            return new Promise((resolve, reject) => {
-                socket.emit(type, data, (data: unknown) => {
-                    if (data.error) {
-                        reject(data.error);
-                    } else {
-                        resolve(data);
-                    }
-                });
-            });
-        };
-
-        // ####################################################
-        // CREATE ROOM AND JOIN
-        // ####################################################
-
-        this.createRoom(this.room_id).then(async () => {
-            const data = {
-                room_id: this.room_id,
-                peer_info: this.peer_info,
-            };
-            await this.join(data);
-            this.initSockets();
-            this._isConnected = true;
-            successCallback();
-        });
-    }
-    isFullScreenSupported(): any {
-        throw new Error('Method not implemented.');
-    }
-    createRoom(room_id: any) {
-        throw new Error('Method not implemented.');
-    }
-    join(data: { room_id: any; peer_info: null; }) {
-        throw new Error('Method not implemented.');
-    }
-    initSockets() {
-        throw new Error('Method not implemented.');
-    }
-
- 
-
-
-// ####################################################
-// INIT ROOM
-// ####################################################
-
-document: any.addEventListener('DOMContentLoaded', function () {
-    initClient();
-});
-
-function initClient() {
-    setTheme();
-
-    // Transcription
-    transcription = new transcription();
-   transcription.init();
-
-    if (!DetectRTC.isMobileDevice) {
-        refreshMainButtonsToolTipPlacement();
-        setTippy('closeEmojiPickerContainer', 'Close', 'bottom');
-    setTippy('mySettingsCloseBtn', 'Close', 'bottom');
-        setTippy(
-            'switchPushToTalk',
-            'If Active, When SpaceBar keydown the microphone will be resumed, on keyup will be paused, like a walkie-talkie.',
-            'right',
-        );
-        setTippy('lobbyAcceptAllBtn', 'Accept', 'top');
-        setTippy('lobbyRejectAllBtn', 'Reject', 'top');
-        setTippy(
-            'switchBroadcasting',
-            'Broadcasting is the dissemination of audio or video content to a large audience (one to many)',
-            'right',
-        );
-        setTippy(
-            'switchLobby',
-            'Lobby mode lets you protect your meeting by only allowing people to enter after a formal approval by a moderator',
-            'right',
-        );
-        setTippy('initVideoAudioRefreshButton', 'Refresh audio/video devices', 'top');
-        setTippy('switchPitchBar', 'Toggle audio pitch bar', 'right');
-        setTippy('switchSounds', 'Toggle the sounds notifications', 'right');
-        setTippy('switchShare', "Show 'Share Room' popup on join", 'right');
-        setTippy('roomId', 'Room name (click to copy)', 'right');
-        setTippy('sessionTime', 'Session time', 'right');
-        setTippy('recordingImage', 'Toggle recording', 'right');
-        setTippy(
-            'switchHostOnlyRecording',
-            'Only the host (presenter) has the capability to record the meeting',
-        'right',
-        );
-        setTippy(
-            'switchH264Recording',
-            'Prioritize h.264 with AAC or h.264 with Opus codecs over VP8 with Opus or VP9 with Opus codecs',
-            'right',
-        );
-        setTippy('switchServerRecording', 'The recording will be stored on the server rather than locally', 'right');
-        setTippy('whiteboardGhostButton', 'Toggle transparent background', 'bottom');
-        setTippy('wbBackgroundColorEl', 'Background color', 'bottom');
-        setTippy('wbDrawingColorEl', 'Drawing color', 'bottom');
-        setTippy('whiteboardPencilBtn', 'Drawing mode', 'bottom');
-        setTippy('whiteboardObjectBtn', 'Object mode', 'bottom');
-        setTippy('whiteboardUndoBtn', 'Undo', 'bottom');
-        setTippy('whiteboardRedoBtn', 'Redo', 'bottom');
-        setTippy('whiteboardImgFileBtn', 'Add image file', 'bottom');
-    setTippy('whiteboardPdfFileBtn', 'Add pdf file', 'bottom');
-setTippy('whiteboardImgUrlBtn', 'Add image url', 'bottom');
-setTippy('whiteboardTextBtn', 'Add text', 'bottom');
-setTippy('whiteboardLineBtn', 'Add line', 'bottom');
-setTippy('whiteboardRectBtn', 'Add rectangle', 'bottom');
-setTippy('whiteboardTriangleBtn', 'Add triangle', 'bottom');
-setTippy('whiteboardCircleBtn', 'Add circle', 'bottom');
-setTippy('whiteboardSaveBtn', 'Save', 'bottom');
-setTippy('whiteboardEraserBtn', 'Eraser', 'bottom');
-    setTippy('whiteboardCleanBtn', 'Clean', 'bottom');
-    setTippy('whiteboardLockButton', 'If enabled, participants cannot interact', 'right');
-    setTippy('whiteboardCloseBtn', 'Close', 'right');
-    setTippy('chatCleanTextButton', 'Clean', 'top');
-    setTippy('chatPasteButton', 'Paste', 'top');
-    setTippy('chatSendButton', 'Send', 'top');
-    setTippy('showChatOnMsg', 'Show chat on new message comes', 'bottom');
-    setTippy('speechIncomingMsg', 'Speech the incoming messages', 'bottom');
-    setTippy('chatSpeechStartButton', 'Start speech recognition', 'top');
-    setTippy('chatSpeechStopButton', 'Stop speech recognition', 'top');
-    setTippy('chatEmojiButton', 'Emoji', 'top');
-    setTippy('chatMarkdownButton', 'Markdown', 'top');
-    setTippy('chatCloseButton', 'Close', 'bottom');
-    setTippy('chatTogglePin', 'Toggle pin', 'bottom');
-    setTippy('chatHideParticipantsList', 'Hide', 'bottom');
-    setTippy('chatShowParticipantsList', 'Toggle participants list', 'bottom');
-    setTippy('chatMaxButton', 'Maximize', 'bottom');
-    setTippy('chatMinButton', 'Minimize', 'bottom');
-    setTippy('participantsSaveBtn', 'Save participants info', 'bottom');
-    setTippy('participantsRaiseHandBtn', 'Toggle raise hands', 'bottom');
-    setTippy('participantsUnreadMessagesBtn', 'Toggle unread messages', 'bottom');
-    setTippy('transcriptionCloseBtn', 'Close', 'bottom');
-        setTippy('transcriptionTogglePinBtn', 'Toggle pin', 'bottom');
-        setTippy('transcriptionMaxBtn', 'Maximize', 'bottom');
-    setTippy('transcriptionMinBtn', 'Minimize', 'bottom');
-    setTippy('transcriptionSpeechStatus', 'Status', 'bottom');
-    setTippy('transcriptShowOnMsg', 'Show transcript on new message comes', 'bottom');
-    setTippy('transcriptPersistentMode', 'Prevent stopping in the absence of speech', 'bottom');
-    setTippy('transcriptionSpeechStart', 'Start transcription', 'top');
-    setTippy('transcriptionSpeechStop', 'Stop transcription', 'top');
-    }
-    setupWhiteboard();
-    initEnumerateDevices();
-    setupInitButtons();
-}
-
-// ####################################################
-// HANDLE MAIN BUTTONS TOOLTIP
-// ####################################################
-
-function refreshMainButtonsToolTipPlacement() {
-    if (!DetectRTC.isMobileDevice) {
+      ngOnInit(): void {
+        this.isScreenShareSupported =  navigator.getDisplayMedia || (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+       this.videogrid.resizeVideoMedia();
+        this.videogrid.resizeMainButtons();
+    
+        // Adding window resize event listener
+        window.addEventListener('resize', this.onWindowResize.bind(this));
+      }
+      isFullScreenSupported(): any {
+          throw new Error('Method not implemented.');
+      }
+      createRoom(room_id: any) {
+          throw new Error('Method not implemented.');
+      }
+      join(data: { room_id: any; peer_info: null; }) {
+          throw new Error('Method not implemented.');
+      }
+      initSockets() {
+          throw new Error('Method not implemented.');
+      }
+  
+   
+  
+  
+  // ####################################################
+  // INIT ROOM
+  // ####################################################
+  
+  document: any.addEventListener('DOMContentLoaded', function () {
+      initClient();
+  });
+  
+  function initClient() {
+      setTheme();
+  
+      // Transcription
+      transcription = new transcription();
+     transcription.init();
+  
+      if (!DetectRTC.isMobileDevice) {
+          refreshMainButtonsToolTipPlacement();
+          setTippy('closeEmojiPickerContainer', 'Close', 'bottom');
+      setTippy('mySettingsCloseBtn', 'Close', 'bottom');
+          setTippy(
+              'switchPushToTalk',
+              'If Active, When SpaceBar keydown the microphone will be resumed, on keyup will be paused, like a walkie-talkie.',
+              'right',
+          );
+          setTippy('lobbyAcceptAllBtn', 'Accept', 'top');
+          setTippy('lobbyRejectAllBtn', 'Reject', 'top');
+          setTippy(
+              'switchBroadcasting',
+              'Broadcasting is the dissemination of audio or video content to a large audience (one to many)',
+              'right',
+          );
+          setTippy(
+              'switchLobby',
+              'Lobby mode lets you protect your meeting by only allowing people to enter after a formal approval by a moderator',
+              'right',
+          );
+          setTippy('initVideoAudioRefreshButton', 'Refresh audio/video devices', 'top');
+          setTippy('switchPitchBar', 'Toggle audio pitch bar', 'right');
+          setTippy('switchSounds', 'Toggle the sounds notifications', 'right');
+          setTippy('switchShare', "Show 'Share Room' popup on join", 'right');
+          setTippy('roomId', 'Room name (click to copy)', 'right');
+          setTippy('sessionTime', 'Session time', 'right');
+          setTippy('recordingImage', 'Toggle recording', 'right');
+          setTippy(
+              'switchHostOnlyRecording',
+              'Only the host (presenter) has the capability to record the meeting',
+          'right',
+          );
+          setTippy(
+              'switchH264Recording',
+              'Prioritize h.264 with AAC or h.264 with Opus codecs over VP8 with Opus or VP9 with Opus codecs',
+              'right',
+          );
+          setTippy('switchServerRecording', 'The recording will be stored on the server rather than locally', 'right');
+          setTippy('whiteboardGhostButton', 'Toggle transparent background', 'bottom');
+          setTippy('wbBackgroundColorEl', 'Background color', 'bottom');
+          setTippy('wbDrawingColorEl', 'Drawing color', 'bottom');
+          setTippy('whiteboardPencilBtn', 'Drawing mode', 'bottom');
+          setTippy('whiteboardObjectBtn', 'Object mode', 'bottom');
+          setTippy('whiteboardUndoBtn', 'Undo', 'bottom');
+          setTippy('whiteboardRedoBtn', 'Redo', 'bottom');
+          setTippy('whiteboardImgFileBtn', 'Add image file', 'bottom');
+      setTippy('whiteboardPdfFileBtn', 'Add pdf file', 'bottom');
+  setTippy('whiteboardImgUrlBtn', 'Add image url', 'bottom');
+  setTippy('whiteboardTextBtn', 'Add text', 'bottom');
+  setTippy('whiteboardLineBtn', 'Add line', 'bottom');
+  setTippy('whiteboardRectBtn', 'Add rectangle', 'bottom');
+  setTippy('whiteboardTriangleBtn', 'Add triangle', 'bottom');
+  setTippy('whiteboardCircleBtn', 'Add circle', 'bottom');
+  setTippy('whiteboardSaveBtn', 'Save', 'bottom');
+  setTippy('whiteboardEraserBtn', 'Eraser', 'bottom');
+      setTippy('whiteboardCleanBtn', 'Clean', 'bottom');
+      setTippy('whiteboardLockButton', 'If enabled, participants cannot interact', 'right');
+      setTippy('whiteboardCloseBtn', 'Close', 'right');
+      setTippy('chatCleanTextButton', 'Clean', 'top');
+      setTippy('chatPasteButton', 'Paste', 'top');
+      setTippy('chatSendButton', 'Send', 'top');
+      setTippy('showChatOnMsg', 'Show chat on new message comes', 'bottom');
+      setTippy('speechIncomingMsg', 'Speech the incoming messages', 'bottom');
+      setTippy('chatSpeechStartButton', 'Start speech recognition', 'top');
+      setTippy('chatSpeechStopButton', 'Stop speech recognition', 'top');
+      setTippy('chatEmojiButton', 'Emoji', 'top');
+      setTippy('chatMarkdownButton', 'Markdown', 'top');
+      setTippy('chatCloseButton', 'Close', 'bottom');
+      setTippy('chatTogglePin', 'Toggle pin', 'bottom');
+      setTippy('chatHideParticipantsList', 'Hide', 'bottom');
+      setTippy('chatShowParticipantsList', 'Toggle participants list', 'bottom');
+      setTippy('chatMaxButton', 'Maximize', 'bottom');
+      setTippy('chatMinButton', 'Minimize', 'bottom');
+      setTippy('participantsSaveBtn', 'Save participants info', 'bottom');
+      setTippy('participantsRaiseHandBtn', 'Toggle raise hands', 'bottom');
+      setTippy('participantsUnreadMessagesBtn', 'Toggle unread messages', 'bottom');
+      setTippy('transcriptionCloseBtn', 'Close', 'bottom');
+          setTippy('transcriptionTogglePinBtn', 'Toggle pin', 'bottom');
+          setTippy('transcriptionMaxBtn', 'Maximize', 'bottom');
+      setTippy('transcriptionMinBtn', 'Minimize', 'bottom');
+      setTippy('transcriptionSpeechStatus', 'Status', 'bottom');
+      setTippy('transcriptShowOnMsg', 'Show transcript on new message comes', 'bottom');
+      setTippy('transcriptPersistentMode', 'Prevent stopping in the absence of speech', 'bottom');
+      setTippy('transcriptionSpeechStart', 'Start transcription', 'top');
+      setTippy('transcriptionSpeechStop', 'Stop transcription', 'top');
+      }
+      setupWhiteboard();
+      initEnumerateDevices();
+      setupInitButtons();
+  }
+  
+  // ####################################################
+  // HANDLE MAIN BUTTONS TOOLTIP
+  // ####################################################
+  
+  function refreshMainButtonsToolTipPlacement() {
+      if (!DetectRTC.isMobileDevice) {
         const placement = BtnsBarPosition.options[BtnsBarPosition.selectedIndex].value == 'vertical' ? 'right' : 'top';
     setTippy('shareButton', 'Share room', placement);
-setTippy('hideMeButton', 'Toggle hide self view', placement);
-setTippy('startAudioButton', 'Start the audio', placement);
-setTippy('stopAudioButton', 'Stop the audio', placement);
-setTippy('startVideoButton', 'Start the video', placement);
-setTippy('stopVideoButton', 'Stop the video', placement);
-setTippy('startScreenButton', 'Start screen share', placement);
-setTippy('stopScreenButton', 'Stop screen share', placement);
-setTippy('startRecButton', 'Start recording', placement);
-setTippy('stopRecButton', 'Stop recording', placement);
-setTippy('raiseHandButton', 'Raise your hand', placement);
-setTippy('lowerHandButton', 'Lower your hand', placement);
-setTippy('emojiRoomButton', 'Toggle emoji reaction', placement);
-setTippy('swapCameraButton', 'Swap the camera', placement);
-setTippy('chatButton', 'Toggle the chat', placement);
-setTippy('transcriptionButton', 'Toggle transcription', placement);
-setTippy('whiteboardButton', 'Toggle the whiteboard', placement);
-setTippy('settingsButton', 'Toggle the settings', placement);
-setTippy('aboutButton', 'About this project', placement);
-setTippy('exitButton', 'Leave room', placement);
-}
-}
+   setTippy('hideMeButton', 'Toggle hide self view', placement);
+   setTippy('startAudioButton', 'Start the audio', placement);
+   setTippy('stopAudioButton', 'Stop the audio', placement);
+   setTippy('startVideoButton', 'Start the video', placement);
+   setTippy('stopVideoButton', 'Stop the video', placement);
+   setTippy('startScreenButton', 'Start screen share', placement);
+   setTippy('stopScreenButton', 'Stop screen share', placement);
+   setTippy('startRecButton', 'Start recording', placement);
+   setTippy('stopRecButton', 'Stop recording', placement);
+   setTippy('raiseHandButton', 'Raise your hand', placement);
+   setTippy('lowerHandButton', 'Lower your hand', placement);
+   setTippy('emojiRoomButton', 'Toggle emoji reaction', placement);
+   setTippy('swapCameraButton', 'Swap the camera', placement);
+   setTippy('chatButton', 'Toggle the chat', placement);
+   setTippy('transcriptionButton', 'Toggle transcription', placement);
+   setTippy('whiteboardButton', 'Toggle the whiteboard', placement);
+   setTippy('settingsButton', 'Toggle the settings', placement);
+   setTippy('aboutButton', 'About this project', placement);
+   setTippy('exitButton', 'Leave room', placement);
+   }
+   }
 
-// ####################################################
-// HANDLE TOOLTIP
-// ####################################################
+ // ####################################################
+ // HANDLE TOOLTIP
+ // ####################################################
 
-function setTippy(elem: string, content: string, placement: string, allowHTML = false) {
-    const element = document.getElementById(elem);
-if (element) {
-    if (element._tippy) {
-        element._tippy.destroy();
-    }
-try {
-            tippy(element, {
-                content: content,
-                placement: placement,
-                allowHTML: allowHTML,
-            });
-        } catch (err) {
-            console.error('setTippy error', err.message);
+    function setTippy(elem: string, content: string, placement: string, allowHTML = false) {
+        const element = document.getElementById(elem);
+    if (element) {
+        if (element._tippy) {
+            element._tippy.destroy();
         }
-    } else {
-        console.warn('setTippy element not found with content', content);
-    }
-}
-
-// ####################################################
-// GET ROOM ID
-// ####################################################
-
-function getRoomId() {
-    const qs = new URLSearchParams(window.location.search);
-const queryRoomId = qs.get('room');
-let roomId = queryRoomId ? queryRoomId : location.pathname.substring(6);
-if (roomId == '') {
-    roomId = makeId(12);
-}
-console.log('Direct join', { room: roomId });
-window.localStorage['lastRoom'] = roomId;
-return roomId;
-}
-
-function makeId(length: number) {
-    let result = '';
-let characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-let charactersLength = characters.length;
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-return result;
-}
-
-// ####################################################
-// INIT ROOM
-// ####################################################
-
-async function initRoom() {
-    if (!isAudioAllowed && !isVideoAllowed && !joinRoomWithoutAudioVideo) {
-        openURL(`/permission?room_id=${room_id}&message=Not allowed both Audio and Video`);
-    } else {
-        setButtonsInit();
-    handleSelectsInit();
-await whoAreYou();
-await setSelectsInit();
-}
-}
-
-// ####################################################
-// ENUMERATE DEVICES
-// ####################################################
-
-async function initEnumerateDevices() {
-    console.log('01 ----> init Enumerate Devices');
-await initEnumerateVideoDevices();
-await initEnumerateAudioDevices();
-    await initRoom();
-}
-
-async function refreshMyAudioVideoDevices() {
-    await refreshMyVideoDevices();
-    await refreshMyAudioDevices();
-}
-
-async function refreshMyVideoDevices(this: any) {
-    if (!isVideoAllowed) return;
-const initVideoSelectIndex = initVideoSelect ? initVideoSelect.selectedIndex : 0;
-    const videoSelectIndex = videoSelect ? this.videoSelect.selectedIndex : 0;
-await initEnumerateVideoDevices();
-    if (initVideoSelect) initVideoSelect.selectedIndex = initVideoSelectIndex;
-if (videoSelect) videoSelect.selectedIndex = videoSelectIndex;
-}
-
-async function refreshMyAudioDevices() {
-    if (!isAudioAllowed) return;
-const initMicrophoneSelectIndex = initMicrophoneSelect ? initMicrophoneSelect.selectedIndex : 0;
-    const initSpeakerSelectIndex = initSpeakerSelect ? initSpeakerSelect.selectedIndex : 0;
-    const microphoneSelectIndex = microphoneSelect ? microphoneSelect.selectedIndex : 0;
-const speakerSelectIndex = speakerSelect ? speakerSelect.selectedIndex : 0;
-await initEnumerateAudioDevices();
-if (initMicrophoneSelect) initMicrophoneSelect.selectedIndex = initMicrophoneSelectIndex;
-if (initSpeakerSelect) initSpeakerSelect.selectedIndex = initSpeakerSelectIndex;
-if (microphoneSelect) microphoneSelect.selectedIndex = microphoneSelectIndex;
-if (speakerSelect) speakerSelect.selectedIndex = speakerSelectIndex;
-}
-
-async function initEnumerateVideoDevices() {
-    // allow the video
-await navigator.mediaDevices
-.getUserMedia({ video: true })
-.then(async (stream) => {
-            await enumerateVideoDevices(stream);
-        isVideoAllowed = true;
-        })
-        .catch(() => {
-            isVideoAllowed = false;
-        });
-}
-
-async function enumerateVideoDevices(stream: MediaStream) {
-    console.log('02 ----> Get Video Devices');
-
-if (videoSelect) videoSelect.innerHTML = '';
-if (initVideoSelect) initVideoSelect.innerHTML = '';
-
-await navigator.mediaDevices
-.enumerateDevices()
-.then((devices) =>
-            devices.forEach(async (device) => {
-                let el,
-                    eli = null;
-                if ('videoinput' === device.kind) {
-                    if (videoSelect) el = videoSelect;
-                    if (initVideoSelect) eli = initVideoSelect;
-                    lS.DEVICES_COUNT.video++;
-                }
-            if (!el) return;
-                await addChild(device, [el, eli]);
-            }),
-        )
-        .then(async () => {
-            await stopTracks(stream);
-            isEnumerateVideoDevices = true;
-        });
-}
-
-async function initEnumerateAudioDevices() {
-    // allow the audio
-    await navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .then(async (stream) => {
-            await enumerateAudioDevices(stream);
-            await getMicrophoneVolumeIndicator(stream);
-            isAudioAllowed = true;
-        })
-        .catch(() => {
-            isAudioAllowed = false;
-        });
-}
-
-async function enumerateAudioDevices(stream: MediaStream) {
-    console.log('03 ----> Get Audio Devices');
-
-    if (microphoneSelect) microphoneSelect.innerHTML = '';
-    if (initMicrophoneSelect) initMicrophoneSelect.innerHTML = '';
-
-    if (speakerSelect) speakerSelect.innerHTML = '';
-    if (initSpeakerSelect) initSpeakerSelect.innerHTML = '';
-
-    await navigator.mediaDevices
-        .enumerateDevices()
-        .then((devices) =>
-            devices.forEach(async (device) => {
-                let el,
-                    eli = null;
-                if ('audioinput' === device.kind) {
-                    if (microphoneSelect) el = microphoneSelect;
-                    if (initMicrophoneSelect) eli = initMicrophoneSelect;
-                    lS.DEVICES_COUNT.audio++;
-                } else if ('audiooutput' === device.kind) {
-                    if (speakerSelect) el = speakerSelect;
-                    if (initSpeakerSelect) eli = initSpeakerSelect;
-                    lS.DEVICES_COUNT.speaker++;
-                }
-                if (!el) return;
-                await addChild(device, [el, eli]);
-            }),
-        )
-        .then(async () => {
-            await stopTracks(stream);
-            isEnumerateAudioDevices = true;
-            speakerSelect.disabled = !sinkId;
-            // Check if there is speakers
-            if (!sinkId || initSpeakerSelect.options.length === 0) {
-                hide(initSpeakerSelect);
-                hide(speakerSelectDiv);
-            }
-        });
-}
-
-async function stopTracks(stream: { getTracks: () => any[]; }) {
-    stream.getTracks().forEach((track: { stop: () => void; }) => {
-        track.stop();
-    });
-}
-
-async function addChild(device: MediaDeviceInfo, els: any[]) {
-    let kind = device.kind;
-    els.forEach((el: { length: number; appendChild: (arg0: HTMLOptionElement) => void; }) => {
-        let option = document.createElement('option');
-        option.value = device.deviceId;
-        switch (kind) {
-            case 'videoinput':
-                option.innerText = `📹 ` + device.label || `📹 camera ${el.length + 1}`;
-                break;
-            case 'audioinput':
-                option.innerText = `🎤 ` + device.label || `🎤 microphone ${el.length + 1}`;
-                break;
-            case 'audiooutput':
-                option.innerText = `🔈 ` + device.label || `🔈 speaker ${el.length + 1}`;
-                break;
-            default:
-                break;
-        }
-        el.appendChild(option);
-    });
-}
-
-// ####################################################
-// INIT AUDIO/VIDEO/SCREEN BUTTONS
-// ####################################################
-
-function setupInitButtons() {
-    initVideoAudioRefreshButton.onclick = () => {
-        refreshMyAudioVideoDevices();
-    };
-    initVideoButton.onclick = () => {
-        handleVideo();
-    };
-    initAudioButton.onclick = () => {
-        handleAudio();
-    };
-    initAudioVideoButton.onclick = async () => {
-        await handleAudioVideo(e);
-    };
-    initStartScreenButton.onclick = async () => {
-        await toggleScreenSharing();
-    };
-    initStopScreenButton.onclick = async () => {
-        await toggleScreenSharing();
-    };
-}
-
-// ####################################################
-// MICROPHONE VOLUME INDICATOR
-// ####################################################
-
-async function getMicrophoneVolumeIndicator(stream: MediaStream) {
-    if (isAudioContextSupported() && hasAudioTrack(stream)) {
-        stopMicrophoneProcessing();
-        const audioContext = new (window.AudioContext || window.AudioContext)();
-        const microphone = audioContext.createMediaStreamSource(stream);
-        const scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);
-        scriptProcessor.onaudioprocess = function (event) {
-            const inputBuffer = event.inputBuffer.getChannelData(0);
-            let sum = 0;
-        for (let i = 0; i < inputBuffer.length; i++) {
-                sum += inputBuffer[i] * inputBuffer[i];
-            }
-            const rms = Math.sqrt(sum / inputBuffer.length);
-        const volume = Math.max(0, Math.min(1, rms * 10));
-    updateVolumeIndicator(volume);
-};
-        microphone.connect(scriptProcessor);
-        scriptProcessor.connect(audioContext.destination);
-    }
-}
-
-function stopMicrophoneProcessing() {
-    if (scriptProcessor) {
-        scriptProcessor.disconnect();
-    const scriptProcessor = null;
-}
-bars.forEach((bar: { classList: { toggle: (arg0: string) => void; }; }) => {
-        bar.classList.toggle('inactive');
-    });
-}
-
-function updateVolumeIndicator(volume: number) {
-    const activeBars = Math.ceil(volume * bars.length);
-bars.forEach((bar: { classList: { toggle: (arg0: string, arg1: boolean) => void; }; }, index: number) => {
-        bar.classList.toggle('active', index < activeBars);
-    });
-}
-
-function isAudioContextSupported() {
-    return !!(window.AudioContext || window.webkitAudioContext);
-}
-
-function hasAudioTrack(mediaStream: { getAudioTracks: () => any; }) {
-    const audioTracks = mediaStream.getAudioTracks();
-return audioTracks.length > 0;
-}
-
-function hasVideoTrack(mediaStream: { getVideoTracks: () => any; }) {
-    const videoTracks = mediaStream.getVideoTracks();
-return videoTracks.length > 0;
-}
-
-// ####################################################
-// API CHECK
-// ####################################################
-
-function getScreen() {
-    let qs = new URLSearchParams(window.location.search);
-let screen = qs.get('screen');
-if (screen) {
-    screen = screen.toLowerCase();
-let queryScreen = screen === '1' || screen === 'true';
-if (queryScreen != null && (navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia)) {
-    console.log('Direct join', { screen: queryScreen });
-return queryScreen;
-}
-}
-console.log('Direct join', { screen: false });
-return false;
-}
-
-function getNotify() {
-    let qs = new URLSearchParams(window.location.search);
-let notify = qs.get('notify');
-    if (notify) {
-        notify = notify.toLowerCase();
-        let queryNotify = notify === '1' || notify === 'true';
-        if (queryNotify != null) {
-            console.log('Direct join', { notify: queryNotify });
-        return queryNotify;
-    }
-}
-notify = localStorageSettings.share_on_join;
-console.log('Direct join', { notify: notify });
-return notify;
-}
-
-function getHideMeActive() {
-    let qs = new URLSearchParams(window.location.search);
-let hide = qs.get('hide');
-let queryHideMe = false;
-if (hide) {
-    hide = hide.toLowerCase();
-queryHideMe = hide === '1' || hide === 'true';
-}
-    console.log('Direct join', { hide: queryHideMe });
-return queryHideMe;
-}
-
-function isPeerPresenter() {
-    let qs = new URLSearchParams(window.location.search);
-let presenter = qs.get('isPresenter');
-if (presenter) {
-    presenter = presenter.toLowerCase();
-let queryPresenter = presenter === '1' || presenter === 'true';
-if (queryPresenter != null) {
-    console.log('Direct join Reconnect', { isPresenter: queryPresenter });
-return queryPresenter;
-}
-}
-console.log('Direct join Reconnect', { presenter: false });
-return false;
-}
-
-function getPeerName() {
-    qs = new URLSearchParams(window.location.search);
-const name = qs.get('name');
-if (isHtml(name!)) {
-    console.log('Direct join', { name: 'Invalid name' });
-return 'Invalid name';
-    }
-    console.log('Direct join', { name: name });
-    return name;
-}
-
-function getPeerUUID() {
-    if (lS.getItemLocalStorage('peer_uuid')) {
-        return lS.getItemLocalStorage('peer_uuid');
-    }
-const peer_uuid = getUUID();
-lS.setItemLocalStorage('peer_uuid', peer_uuid);
-return peer_uuid;
-}
-
-function getPeerToken() {
-    if (window.sessionStorage.peer_token) return window.sessionStorage.peer_token;
-let qs = new URLSearchParams(window.location.search);
-let token = qs.get('token');
-let queryToken = false;
-if (token) {
-    queryToken = token;
-    }
-console.log('Direct join', { token: queryToken });
-return queryToken;
-}
-
-function getRoomPassword() {
-    let qs = new URLSearchParams(window.location.search);
-let roomPassword = qs.get('roomPassword');
-if (roomPassword) {
-    let queryNoRoomPassword = roomPassword === '0' || roomPassword === 'false';
-if (queryNoRoomPassword) {
-    roomPassword = false;
-}
-console.log('Direct join', { password: roomPassword });
-return roomPassword;
-}
-return false;
-}
-
-// ####################################################
-// INIT CONFIG
-// ####################################################
-
-async function checkInitConfig() {
-    const localStorageInitConfig = lS.getLocalStorageInitConfig();
-console.log('04.5 ----> Get init config', localStorageInitConfig);
-if (localStorageInitConfig) {
-    if (isAudioVideoAllowed && !localStorageInitConfig.audioVideo) {
-        await handleAudioVideo();
-    } else {
-        if (isAudioAllowed && !localStorageInitConfig.audio) handleAudio();
-            if (isVideoAllowed && !localStorageInitConfig.video) handleVideo();
-        }
-    }
-}
-
-
-// ####################################################
-// SOME PEER INFO
-// ####################################################
-
-function getPeerInfo() {
-    const peer_info = {
-        join_data_time: getDataTimeString(),
-        peer_uuid: peer_uuid,
-        peer_id: socket.id,
-        peer_name: peer_name,
-        peer_token: peer_token,
-        peer_presenter: isPresenter,
-        peer_audio: isAudioAllowed,
-        peer_video: isVideoAllowed,
-        peer_screen: isScreenAllowed,
-        peer_recording: isRecording,
-        peer_video_privacy: isVideoPrivacyActive,
-        peer_hand: false,
-        is_desktop_device: !DetectRTC.isMobileDevice && !isTabletDevice && !isIPadDevice,
-        is_mobile_device: DetectRTC.isMobileDevice,
-        is_tablet_device: isTabletDevice,
-        is_ipad_pro_device: isIPadDevice,
-        os_name: DetectRTC.osName,
-        os_version: DetectRTC.osVersion,
-        browser_name: DetectRTC.browser.name,
-        browser_version: DetectRTC.browser.version,
-        user_agent: userAgent,
-    };
-}
-
-// ####################################################
-// ENTER YOUR NAME | Enable/Disable AUDIO/VIDEO
-// ####################################################
-
-async function whoAreYou() {
-    console.log('04 ----> Who are you?');
-
-    hide(loadingDiv);
-    document.body.style.background = 'var(--body-bg)';
-
     try {
-        const response = await axios.get('/config', {
-            timeout: 5000,
-        });
-        const serverButtons = response.data.message;
-        if (serverButtons) {
-            const BUTTONS = serverButtons;
-            console.log('04 ----> AXIOS ROOM BUTTONS SETTINGS', {
-                serverButtons: serverButtons,
-                clientButtons: BUTTONS,
-            });
-        }
-    } catch (error) {
-        console.error('04 ----> AXIOS GET CONFIG ERROR', error.message);
-    }
-
-    if (navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia) {
-        BUTTONS.main.startScreenButton && show(initStartScreenButton);
-    }
-
-    if (peer_name) {
-        checkMedia();
-        getPeerInfo();
-        joinRoom(peer_name, room_id);
-        return;
-    }
-
-    let default_name = window.localStorage.peer_name ? window.localStorage.peer_name : '';
-    if (getCookie(room_id + '_name')) {
-        default_name = getCookie(room_id + '_name');
-    }
-
-    if (!BUTTONS.main.startVideoButton) {
-        isVideoAllowed = false;
-        elemDisplay('initVideo', false);
-        elemDisplay('initVideoButton', false);
-        elemDisplay('initAudioVideoButton', false);
-        elemDisplay('initVideoAudioRefreshButton', false);
-        elemDisplay('initVideoSelect', false);
-        elemDisplay('tabVideoDevicesBtn', false);
-        initVideoContainerShow(false);
-    }
-    if (!BUTTONS.main.startAudioButton) {
-        isAudioAllowed = false;
-        elemDisplay('initAudioButton', false);
-        elemDisplay('initAudioVideoButton', false);
-        elemDisplay('initVideoAudioRefreshButton', false);
-        elemDisplay('initMicrophoneSelect', false);
-        elemDisplay('initSpeakerSelect', false);
-        elemDisplay('tabAudioDevicesBtn', false);
-    }
-    if (!BUTTONS.main.startScreenButton) {
-        hide(initStartScreenButton);
-    }
-
-    initUser.classList.toggle('hidden');
-
-    Swal.fire({
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        background: swalBackground,
-        title: 'tdc',
-        input: 'text',
-        inputPlaceholder: 'Enter your name',
-        inputAttributes: { maxlength: 32 },
-        inputValue: default_name,
-        html: initUser, // Inject HTML
-        confirmButtonText: `Join meeting`,
-        customClass: { popup: 'init-modal-size' },
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        inputValidator: (name: string | any[]) => {
-            if (!name) return 'Please enter your name';
-            if (name.length > 30) return 'Name must be max 30 char';
-       
-            if (isHtml(name)) return 'Invalid name!';
-            if (!getCookie(room_id + '_name')) {
-                window.localStorage.peer_name = name;
+                tippy(element, {
+                    content: content,
+                    placement: placement,
+                    allowHTML: allowHTML,
+                });
+            } catch (err) {
+                console.error('setTippy error', err.message);
             }
-            setCookie(room_id + '_name', name, 30);
-            peer_name = name;
-        },
-    }).then(async () => {
-        if (initStream && !joinRoomWithScreen) {
-            await stopTracks(initStream);
-            elemDisplay('initVideo', false);
-            initVideoContainerShow(false);
-        }
-        getPeerInfo();
-        joinRoom(peer_name, room_id);
-    });
-
-    if (!isVideoAllowed) {
-        elemDisplay('initVideo', false);
-        initVideoContainerShow(false);
-        hide(initVideoSelect);
-    }
-    if (!isAudioAllowed) {
-        hide(initMicrophoneSelect);
-        hide(initSpeakerSelect);
-    }
-}
-
-function handleAudio() {
-      isAudioAllowed = isAudioAllowed ? false : true;
-    initAudioButton.className = 'fas fa-microphone' + (isAudioAllowed ? '' : '-slash');
-    setColor(initAudioButton, isAudioAllowed ? 'white' : 'red');
-    setColor(startAudioButton, isAudioAllowed ? 'white' : 'red');
-    checkInitAudio(isAudioAllowed);
-    lS.setInitConfig(lS.MEDIA_TYPE.audio, isAudioAllowed);
-}
-
-function handleVideo() {
-  const isVideoAllowed = isVideoAllowed ? false : true;
-    initVideoButton.className = 'fas fa-video' + (isVideoAllowed ? '' : '-slash');
-    setColor(initVideoButton, isVideoAllowed ? 'white' : 'red');
-    setColor(startVideoButton, isVideoAllowed ? 'white' : 'red');
-    checkInitVideo(isVideoAllowed);
-    lS.setInitConfig(lS.MEDIA_TYPE.video, isVideoAllowed);
-}
-
-async function handleAudioVideo() {
-   const isAudioVideoAllowed = isAudioVideoAllowed ? false : true;
-    isAudioAllowed = isAudioVideoAllowed;
-    isVideoAllowed = isAudioVideoAllowed;
-    lS.setInitConfig(lS.MEDIA_TYPE.audio, isAudioVideoAllowed);
-    lS.setInitConfig(lS.MEDIA_TYPE.video, isAudioVideoAllowed);
-    lS.setInitConfig(lS.MEDIA_TYPE.audioVideo, isAudioVideoAllowed);
-    initAudioButton.className = 'fas fa-microphone' + (isAudioVideoAllowed ? '' : '-slash');
-    initVideoButton.className = 'fas fa-video' + (isAudioVideoAllowed ? '' : '-slash');
-    initAudioVideoButton.className = 'fas fa-eye' + (isAudioVideoAllowed ? '' : '-slash');
-    if (!isAudioVideoAllowed) {
-        hide(initAudioButton);
-        hide(initVideoButton);
-        hide(initVideoAudioRefreshButton);
-    }
-    if (isAudioAllowed && isVideoAllowed && !DetectRTC.isMobileDevice) show(initVideoAudioRefreshButton);
-    setColor(initAudioVideoButton, isAudioVideoAllowed ? 'white' : 'red');
-    setColor(initAudioButton, isAudioAllowed ? 'white' : 'red');
-    setColor(initVideoButton, isVideoAllowed ? 'white' : 'red');
-    setColor(startAudioButton, isAudioAllowed ? 'white' : 'red');
-    setColor(startVideoButton, isVideoAllowed ? 'white' : 'red');
-    await checkInitVideo(isVideoAllowed);
-    checkInitAudio(isAudioAllowed);
-}
-
-async function checkInitVideo(isVideoAllowed: boolean) {
-    if (isVideoAllowed && BUTTONS.main.startVideoButton) {
-        if (initVideoSelect.value) {
-            initVideoContainerShow();
-            await changeCamera(initVideoSelect.value);
-        }
-        sound('joined');
-    } else {
-        if (initStream) {
-            stopTracks(initStream);
-            elemDisplay('initVideo', false);
-            initVideoContainerShow(false);
-            sound('left');
+        } else {
+            console.warn('setTippy element not found with content', content);
         }
     }
-    initVideoSelect.disabled = !isVideoAllowed;
-}
-
-function checkInitAudio(isAudioAllowed: any) {
-    initMicrophoneSelect.disabled = !isAudioAllowed;
-    initSpeakerSelect.disabled = !isAudioAllowed;
-    isAudioAllowed ? sound('joined') : sound('left');
-}
-
-function initVideoContainerShow(show = true) {
-    initVideoContainerClass.style.width = show ? '100%' : 'auto';
-}
-
-function checkMedia() {
+    
+    // ####################################################
+    // GET ROOM ID
+    // ####################################################
+    
+    function getRoomId() {
+        const qs = new URLSearchParams(window.location.search);
+    const queryRoomId = qs.get('room');
+    let roomId = queryRoomId ? queryRoomId : location.pathname.substring(6);
+    if (roomId == '') {
+        roomId = makeId(12);
+    }
+    console.log('Direct join', { room: roomId });
+    window.localStorage['lastRoom'] = roomId;
+    return roomId;
+    }
+    
+    function makeId(length: number) {
+        let result = '';
+    let characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let charactersLength = characters.length;
+        for (let i = 0; i < length; i++) {
+            result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        }
+    return result;
+    }
+    
+    // ####################################################
+    // INIT ROOM
+    // ####################################################
+    
+    async function initRoom() {
+        if (!isAudioAllowed && !isVideoAllowed && !joinRoomWithoutAudioVideo) {
+            openURL(`/permission?room_id=${room_id}&message=Not allowed both Audio and Video`);
+        } else {
+            setButtonsInit();
+        handleSelectsInit();
+    await whoAreYou();
+    await setSelectsInit();
+    }
+    }
+    
+    // ####################################################
+    // ENUMERATE DEVICES
+    // ####################################################
+    
+    async function initEnumerateDevices() {
+        console.log('01 ----> init Enumerate Devices');
+    await initEnumerateVideoDevices();
+    await initEnumerateAudioDevices();
+        await initRoom();
+    }
+    
+    async function refreshMyAudioVideoDevices() {
+        await refreshMyVideoDevices();
+        await refreshMyAudioDevices();
+    }
+    
+    async function refreshMyVideoDevices(this: any) {
+        if (!isVideoAllowed) return;
+    const initVideoSelectIndex = initVideoSelect ? initVideoSelect.selectedIndex : 0;
+        const videoSelectIndex = videoSelect ? this.videoSelect.selectedIndex : 0;
+    await initEnumerateVideoDevices();
+        if (initVideoSelect) initVideoSelect.selectedIndex = initVideoSelectIndex;
+    if (videoSelect) videoSelect.selectedIndex = videoSelectIndex;
+    }
+    
+    async function refreshMyAudioDevices() {
+        if (!isAudioAllowed) return;
+    const initMicrophoneSelectIndex = initMicrophoneSelect ? initMicrophoneSelect.selectedIndex : 0;
+        const initSpeakerSelectIndex = initSpeakerSelect ? initSpeakerSelect.selectedIndex : 0;
+        const microphoneSelectIndex = microphoneSelect ? microphoneSelect.selectedIndex : 0;
+    const speakerSelectIndex = speakerSelect ? speakerSelect.selectedIndex : 0;
+    await initEnumerateAudioDevices();
+    if (initMicrophoneSelect) initMicrophoneSelect.selectedIndex = initMicrophoneSelectIndex;
+    if (initSpeakerSelect) initSpeakerSelect.selectedIndex = initSpeakerSelectIndex;
+    if (microphoneSelect) microphoneSelect.selectedIndex = microphoneSelectIndex;
+    if (speakerSelect) speakerSelect.selectedIndex = speakerSelectIndex;
+    }
+    
+    async function initEnumerateVideoDevices() {
+        // allow the video
+    await navigator.mediaDevices
+    .getUserMedia({ video: true })
+    .then(async (stream) => {
+                await enumerateVideoDevices(stream);
+            isVideoAllowed = true;
+            })
+            .catch(() => {
+                isVideoAllowed = false;
+            });
+    }
+    
+    async function enumerateVideoDevices(stream: MediaStream) {
+        console.log('02 ----> Get Video Devices');
+    
+    if (videoSelect) videoSelect.innerHTML = '';
+    if (initVideoSelect) initVideoSelect.innerHTML = '';
+    
+    await navigator.mediaDevices
+    .enumerateDevices()
+    .then((devices) =>
+                devices.forEach(async (device) => {
+                    let el,
+                        eli = null;
+                    if ('videoinput' === device.kind) {
+                        if (videoSelect) el = videoSelect;
+                        if (initVideoSelect) eli = initVideoSelect;
+                        lS.DEVICES_COUNT.video++;
+                    }
+                if (!el) return;
+                    await addChild(device, [el, eli]);
+                }),
+            )
+            .then(async () => {
+                await stopTracks(stream);
+                isEnumerateVideoDevices = true;
+            });
+    }
+    
+    async function initEnumerateAudioDevices() {
+        // allow the audio
+        await navigator.mediaDevices
+            .getUserMedia({ audio: true })
+            .then(async (stream) => {
+                await enumerateAudioDevices(stream);
+                await getMicrophoneVolumeIndicator(stream);
+                isAudioAllowed = true;
+            })
+            .catch(() => {
+                isAudioAllowed = false;
+            });
+    }
+    
+    async function enumerateAudioDevices(stream: MediaStream) {
+        console.log('03 ----> Get Audio Devices');
+    
+        if (microphoneSelect) microphoneSelect.innerHTML = '';
+        if (initMicrophoneSelect) initMicrophoneSelect.innerHTML = '';
+    
+        if (speakerSelect) speakerSelect.innerHTML = '';
+        if (initSpeakerSelect) initSpeakerSelect.innerHTML = '';
+    
+        await navigator.mediaDevices
+            .enumerateDevices()
+            .then((devices) =>
+                devices.forEach(async (device) => {
+                    let el,
+                        eli = null;
+                    if ('audioinput' === device.kind) {
+                        if (microphoneSelect) el = microphoneSelect;
+                        if (initMicrophoneSelect) eli = initMicrophoneSelect;
+                        lS.DEVICES_COUNT.audio++;
+                    } else if ('audiooutput' === device.kind) {
+                        if (speakerSelect) el = speakerSelect;
+                        if (initSpeakerSelect) eli = initSpeakerSelect;
+                        lS.DEVICES_COUNT.speaker++;
+                    }
+                    if (!el) return;
+                    await addChild(device, [el, eli]);
+                }),
+            )
+            .then(async () => {
+                await stopTracks(stream);
+                isEnumerateAudioDevices = true;
+                speakerSelect.disabled = !sinkId;
+                // Check if there is speakers
+                if (!sinkId || initSpeakerSelect.options.length === 0) {
+                    hide(initSpeakerSelect);
+                    hide(speakerSelectDiv);
+                }
+            });
+    }
+    
+    async function stopTracks(stream: { getTracks: () => any[]; }) {
+        stream.getTracks().forEach((track: { stop: () => void; }) => {
+            track.stop();
+        });
+    }
+    
+    async function addChild(device: MediaDeviceInfo, els: any[]) {
+        let kind = device.kind;
+        els.forEach((el: { length: number; appendChild: (arg0: HTMLOptionElement) => void; }) => {
+            let option = document.createElement('option');
+            option.value = device.deviceId;
+            switch (kind) {
+                case 'videoinput':
+                    option.innerText = `📹 ` + device.label || `📹 camera ${el.length + 1}`;
+                    break;
+                case 'audioinput':
+                    option.innerText = `🎤 ` + device.label || `🎤 microphone ${el.length + 1}`;
+                    break;
+                case 'audiooutput':
+                    option.innerText = `🔈 ` + device.label || `🔈 speaker ${el.length + 1}`;
+                    break;
+                default:
+                    break;
+            }
+            el.appendChild(option);
+        });
+    }
+    
+    // ####################################################
+    // INIT AUDIO/VIDEO/SCREEN BUTTONS
+    // ####################################################
+    
+    function setupInitButtons() {
+        initVideoAudioRefreshButton.onclick = () => {
+            refreshMyAudioVideoDevices();
+        };
+        initVideoButton.onclick = () => {
+            handleVideo();
+        };
+        initAudioButton.onclick = () => {
+            handleAudio();
+        };
+        initAudioVideoButton.onclick = async () => {
+            await handleAudioVideo(e);
+        };
+        initStartScreenButton.onclick = async () => {
+            await toggleScreenSharing();
+        };
+        initStopScreenButton.onclick = async () => {
+            await toggleScreenSharing();
+        };
+    }
+    
+    // ####################################################
+    // MICROPHONE VOLUME INDICATOR
+    // ####################################################
+    
+    async function getMicrophoneVolumeIndicator(stream: MediaStream) {
+        if (isAudioContextSupported() && hasAudioTrack(stream)) {
+            stopMicrophoneProcessing();
+            const audioContext = new (window.AudioContext || window.AudioContext)();
+            const microphone = audioContext.createMediaStreamSource(stream);
+            const scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);
+            scriptProcessor.onaudioprocess = function (event) {
+                const inputBuffer = event.inputBuffer.getChannelData(0);
+                let sum = 0;
+            for (let i = 0; i < inputBuffer.length; i++) {
+                    sum += inputBuffer[i] * inputBuffer[i];
+                }
+                const rms = Math.sqrt(sum / inputBuffer.length);
+            const volume = Math.max(0, Math.min(1, rms * 10));
+        updateVolumeIndicator(volume);
+    };
+            microphone.connect(scriptProcessor);
+            scriptProcessor.connect(audioContext.destination);
+        }
+    }
+    
+    function stopMicrophoneProcessing() {
+        if (scriptProcessor) {
+            scriptProcessor.disconnect();
+        const scriptProcessor = null;
+    }
+    bars.forEach((bar: { classList: { toggle: (arg0: string) => void; }; }) => {
+            bar.classList.toggle('inactive');
+        });
+    }
+    
+    function updateVolumeIndicator(volume: number) {
+        const activeBars = Math.ceil(volume * bars.length);
+    bars.forEach((bar: { classList: { toggle: (arg0: string, arg1: boolean) => void; }; }, index: number) => {
+            bar.classList.toggle('active', index < activeBars);
+        });
+    }
+    
+    function isAudioContextSupported() {
+        return !!(window.AudioContext || window.webkitAudioContext);
+    }
+    
+    function hasAudioTrack(mediaStream: { getAudioTracks: () => any; }) {
+        const audioTracks = mediaStream.getAudioTracks();
+    return audioTracks.length > 0;
+    }
+    
+    function hasVideoTrack(mediaStream: { getVideoTracks: () => any; }) {
+        const videoTracks = mediaStream.getVideoTracks();
+    return videoTracks.length > 0;
+    }
+    
+    // ####################################################
+    // API CHECK
+    // ####################################################
+    
+    function getScreen() {
+        let qs = new URLSearchParams(window.location.search);
+    let screen = qs.get('screen');
+    if (screen) {
+        screen = screen.toLowerCase();
+    let queryScreen = screen === '1' || screen === 'true';
+    if (queryScreen != null && (navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia)) {
+        console.log('Direct join', { screen: queryScreen });
+    return queryScreen;
+    }
+    }
+    console.log('Direct join', { screen: false });
+    return false;
+    }
+    
+    function getNotify() {
+        let qs = new URLSearchParams(window.location.search);
+    let notify = qs.get('notify');
+        if (notify) {
+            notify = notify.toLowerCase();
+            let queryNotify = notify === '1' || notify === 'true';
+            if (queryNotify != null) {
+                console.log('Direct join', { notify: queryNotify });
+            return queryNotify;
+        }
+    }
+    notify = localStorage['localStorageSettings'].share_on_join;
+    console.log('Direct join', { notify: notify });
+    return notify;
+    }
+    
+    function getHideMeActive() {
+        let qs = new URLSearchParams(window.location.search);
+    let hide = qs.get('hide');
+    let queryHideMe = false;
+    if (hide) {
+        hide = hide.toLowerCase();
+    queryHideMe = hide === '1' || hide === 'true';
+    }
+        console.log('Direct join', { hide: queryHideMe });
+    return queryHideMe;
+    }
+    
+    function isPeerPresenter() {
+        let qs = new URLSearchParams(window.location.search);
+    let presenter = qs.get('isPresenter');
+    if (presenter) {
+        presenter = presenter.toLowerCase();
+    let queryPresenter = presenter === '1' || presenter === 'true';
+    if (queryPresenter != null) {
+        console.log('Direct join Reconnect', { isPresenter: queryPresenter });
+    return queryPresenter;
+    }
+    }
+    console.log('Direct join Reconnect', { presenter: false });
+    return false;
+    }
+    
+    function getPeerName() {
+      let  qs = new URLSearchParams(window.location.search);
+    const name = qs.get('name');
+    if (isHtml(name!)) {
+        console.log('Direct join', { name: 'Invalid name' });
+    return 'Invalid name';
+        }
+        console.log('Direct join', { name: name });
+        return name;
+    }
+    
+    function getPeerUUID() {
+        if (lS.getItemLocalStorage('peer_uuid')) {
+            return lS.getItemLocalStorage('peer_uuid');
+        }
+    const peer_uuid = getUUID();
+    lS.setItemLocalStorage('peer_uuid', peer_uuid);
+    return peer_uuid;
+    }
+    
+    function getPeerToken() {
+        if (window.sessionStorage['peer_token']) return window.sessionStorage['peer_token'];
     let qs = new URLSearchParams(window.location.search);
-    let audio = qs.get('audio');
-    let video = qs.get('video');
-    if (audio) {
-        audio = audio.toLowerCase();
-        let queryPeerAudio = audio === '1' || audio === 'true';
-        if (queryPeerAudio != null) isAudioAllowed = queryPeerAudio;
-    }
-    if (video) {
-        video = video.toLowerCase();
-        let queryPeerVideo = video === '1' || video === 'true';
-        if (queryPeerVideo != null) isVideoAllowed = queryPeerVideo;
-    }
-    // elemDisplay('tabVideoDevicesBtn', isVideoAllowed);
-    // elemDisplay('tabAudioDevicesBtn', isAudioAllowed);
-
-    console.log('Direct join', {
-        audio: isAudioAllowed,
-        video: isVideoAllowed,
-    });
-}
-
-// ####################################################
-// SHARE ROOM
-// ####################################################
-
-async function shareRoom(useNavigator = false) {
-    if (navigator.share && useNavigator) {
-        try {
-            await navigator.share({ url: RoomURL });
-            userLog('info', 'Room Shared successfully', 'top-end');
-        } catch (err) {
-            share();
+    let token = qs.get('token');
+    let queryToken = false;
+    if (token) {
+        queryToken = token;
         }
-    } else {
-        share();
+    console.log('Direct join', { token: queryToken });
+    return queryToken;
     }
-    function share() {
-        sound('open');
-
+    
+    function getRoomPassword() {
+        let qs = new URLSearchParams(window.location.search);
+    let roomPassword = qs.get('roomPassword');
+    if (roomPassword) {
+        let queryNoRoomPassword = roomPassword === '0' || roomPassword === 'false';
+    if (queryNoRoomPassword) {
+        roomPassword = false;
+    }
+    console.log('Direct join', { password: roomPassword });
+    return roomPassword;
+    }
+    return false;
+    }
+    
+    // ####################################################
+    // INIT CONFIG
+    // ####################################################
+    
+    async function checkInitConfig() {
+        const localStorageInitConfig = lS.getLocalStorageInitConfig();
+    console.log('04.5 ----> Get init config', localStorageInitConfig);
+    if (localStorageInitConfig) {
+        if (isAudioVideoAllowed && !localStorageInitConfig.audioVideo) {
+            await handleAudioVideo();
+        } else {
+            if (isAudioAllowed && !localStorageInitConfig.audio) handleAudio();
+                if (isVideoAllowed && !localStorageInitConfig.video) handleVideo();
+            }
+        }
+    }
+    
+    
+    // ####################################################
+    // SOME PEER INFO
+    // ####################################################
+    
+    function getPeerInfo() {
+        const peer_info = {
+            join_data_time: getDataTimeString(),
+            peer_uuid: peer_uuid,
+            peer_id: socket.id,
+            peer_name: peer_name,
+            peer_token: peer_token,
+            peer_presenter: isPresenter,
+            peer_audio: isAudioAllowed,
+            peer_video: isVideoAllowed,
+            peer_screen: isScreenAllowed,
+            peer_recording: isRecording,
+            peer_video_privacy: isVideoPrivacyActive,
+            peer_hand: false,
+            is_desktop_device: !DetectRTC.isMobileDevice && !isTabletDevice && !isIPadDevice,
+            is_mobile_device: DetectRTC.isMobileDevice,
+            is_tablet_device: isTabletDevice,
+            is_ipad_pro_device: isIPadDevice,
+            os_name: DetectRTC.osName,
+            os_version: DetectRTC.osVersion,
+            browser_name: DetectRTC.browser.name,
+            browser_version: DetectRTC.browser.version,
+            user_agent: userAgent,
+        };
+    }
+    
+    // ####################################################
+    // ENTER YOUR NAME | Enable/Disable AUDIO/VIDEO
+    // ####################################################
+    
+    async function whoAreYou() {
+        console.log('04 ----> Who are you?');
+    
+        hide(loadingDiv);
+        document.body.style.background = 'var(--body-bg)';
+    
+        try {
+            const response = await axios.get('/config', {
+                timeout: 5000,
+            });
+            const serverButtons = response.data.message;
+            if (serverButtons) {
+                const BUTTONS = serverButtons;
+                console.log('04 ----> AXIOS ROOM BUTTONS SETTINGS', {
+                    serverButtons: serverButtons,
+                    clientButtons: BUTTONS,
+                });
+            }
+        } catch (error) {
+            console.error('04 ----> AXIOS GET CONFIG ERROR', error.message);
+        }
+    
+        if (navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia) {
+            BUTTONS.main.startScreenButton && show(initStartScreenButton);
+        }
+    
+        if (peer_name) {
+            checkMedia();
+            getPeerInfo();
+            joinRoom(peer_name, room_id);
+            return;
+        }
+    
+        let default_name = window.localStorage.peer_name ? window.localStorage.peer_name : '';
+        if (getCookie(room_id + '_name')) {
+            default_name = getCookie(room_id + '_name');
+        }
+    
+        if (!BUTTONS.main.startVideoButton) {
+            isVideoAllowed = false;
+            elemDisplay('initVideo', false);
+            elemDisplay('initVideoButton', false);
+            elemDisplay('initAudioVideoButton', false);
+            elemDisplay('initVideoAudioRefreshButton', false);
+            elemDisplay('initVideoSelect', false);
+            elemDisplay('tabVideoDevicesBtn', false);
+            initVideoContainerShow(false);
+        }
+        if (!BUTTONS.main.startAudioButton) {
+            isAudioAllowed = false;
+            elemDisplay('initAudioButton', false);
+            elemDisplay('initAudioVideoButton', false);
+            elemDisplay('initVideoAudioRefreshButton', false);
+            elemDisplay('initMicrophoneSelect', false);
+            elemDisplay('initSpeakerSelect', false);
+            elemDisplay('tabAudioDevicesBtn', false);
+        }
+        if (!BUTTONS.main.startScreenButton) {
+            hide(initStartScreenButton);
+        }
+    
+        initUser.classList.toggle('hidden');
+    
         Swal.fire({
+            allowOutsideClick: false,
+            allowEscapeKey: false,
             background: swalBackground,
-            position: 'center',
-            title: 'Share the room',
-            html: `
-            <div id="qrRoomContainer">
-                <canvas id="qrRoom"></canvas>
-            </div>
-            <br/>
-            <p style="background:transparent; color:rgb(8, 189, 89);">Join from your mobile device</p>
-            <p style="background:transparent; color:white; font-family: Arial, Helvetica, sans-serif;">No need for apps, simply capture the QR code with your mobile camera Or Invite someone else to join by sending them the following URL</p>
-            <p style="background:transparent; color:rgb(8, 189, 89);">${RoomURL}</p>`,
-            showDenyButton: true,
-            showCancelButton: true,
-            cancelButtonColor: 'red',
-            denyButtonColor: 'green',
-            confirmButtonText: `Copy URL`,
-            denyButtonText: `Email invite`,
-            cancelButtonText: `Close`,
+            title: 'tdc',
+            input: 'text',
+            inputPlaceholder: 'Enter your name',
+            inputAttributes: { maxlength: 32 },
+            inputValue: default_name,
+            html: initUser, // Inject HTML
+            confirmButtonText: `Join meeting`,
+            customClass: { popup: 'init-modal-size' },
             showClass: { popup: 'animate__animated animate__fadeInDown' },
             hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result: { isConfirmed: any; isDenied: any; }) => {
-            if (result.isConfirmed) {
-                copyRoomURL();
-            } else if (result.isDenied) {
-                shareRoomByEmail();
+            inputValidator: (name: string | any[]) => {
+                if (!name) return 'Please enter your name';
+                if (name.length > 30) return 'Name must be max 30 char';
+            
+                if (isHtml(name)) return 'Invalid name!';
+                if (!getCookie(room_id + '_name')) {
+                    window.localStorage.peer_name = name;
+                }
+                setCookie(room_id + '_name', name, 30);
+                peer_name = name;
+            },
+        }).then(async () => {
+            if (initStream && !joinRoomWithScreen) {
+                await stopTracks(initStream);
+                elemDisplay('initVideo', false);
+                initVideoContainerShow(false);
             }
-            // share screen on join
-            if (isScreenAllowed) {
-                rc.shareScreen();
+            getPeerInfo();
+            joinRoom(peer_name, room_id);
+        });
+    
+        if (!isVideoAllowed) {
+            elemDisplay('initVideo', false);
+            initVideoContainerShow(false);
+            hide(initVideoSelect);
+        }
+        if (!isAudioAllowed) {
+            hide(initMicrophoneSelect);
+            hide(initSpeakerSelect);
+        }
+    }
+    
+    function handleAudio() {
+          isAudioAllowed = isAudioAllowed ? false : true;
+        initAudioButton.className = 'fas fa-microphone' + (isAudioAllowed ? '' : '-slash');
+        setColor(initAudioButton, isAudioAllowed ? 'white' : 'red');
+        setColor(startAudioButton, isAudioAllowed ? 'white' : 'red');
+        checkInitAudio(isAudioAllowed);
+        lS.setInitConfig(lS.MEDIA_TYPE.audio, isAudioAllowed);
+    }
+    
+    function handleVideo() {
+      const isVideoAllowed = isVideoAllowed ? false : true;
+        initVideoButton.className = 'fas fa-video' + (isVideoAllowed ? '' : '-slash');
+        setColor(initVideoButton, isVideoAllowed ? 'white' : 'red');
+        setColor(startVideoButton, isVideoAllowed ? 'white' : 'red');
+        checkInitVideo(isVideoAllowed);
+        lS.setInitConfig(lS.MEDIA_TYPE.video, isVideoAllowed);
+    }
+    
+    async function handleAudioVideo() {
+       const isAudioVideoAllowed = this.isAudioVideoAllowed ? false : true;
+        isAudioAllowed = isAudioVideoAllowed;
+        isVideoAllowed = isAudioVideoAllowed;
+        lS.setInitConfig(lS.MEDIA_TYPE.audio, isAudioVideoAllowed);
+        lS.setInitConfig(lS.MEDIA_TYPE.video, isAudioVideoAllowed);
+        lS.setInitConfig(lS.MEDIA_TYPE.audioVideo, isAudioVideoAllowed);
+        initAudioButton.className = 'fas fa-microphone' + (isAudioVideoAllowed ? '' : '-slash');
+        initVideoButton.className = 'fas fa-video' + (isAudioVideoAllowed ? '' : '-slash');
+        initAudioVideoButton.className = 'fas fa-eye' + (isAudioVideoAllowed ? '' : '-slash');
+        if (!isAudioVideoAllowed) {
+            hide(initAudioButton);
+            hide(initVideoButton);
+            hide(initVideoAudioRefreshButton);
+        }
+        if (isAudioAllowed && isVideoAllowed && !DetectRTC.isMobileDevice) show(initVideoAudioRefreshButton);
+        setColor(initAudioVideoButton, isAudioVideoAllowed ? 'white' : 'red');
+        setColor(initAudioButton, isAudioAllowed ? 'white' : 'red');
+        setColor(initVideoButton, isVideoAllowed ? 'white' : 'red');
+        setColor(startAudioButton, isAudioAllowed ? 'white' : 'red');
+        setColor(startVideoButton, isVideoAllowed ? 'white' : 'red');
+        await checkInitVideo(isVideoAllowed);
+        checkInitAudio(isAudioAllowed);
+    }
+    
+    async function checkInitVideo(isVideoAllowed: boolean) {
+        if (isVideoAllowed && BUTTONS.main.startVideoButton) {
+            if (initVideoSelect.value) {
+                initVideoContainerShow();
+                await changeCamera(initVideoSelect.value);
+            }
+            sound('joined');
+        } else {
+            if (initStream) {
+                stopTracks(initStream);
+                elemDisplay('initVideo', false);
+                initVideoContainerShow(false);
+                sound('left');
+            }
+        }
+        initVideoSelect.disabled = !isVideoAllowed;
+    }
+    
+    function checkInitAudio(isAudioAllowed: any) {
+        initMicrophoneSelect.disabled = !isAudioAllowed;
+        initSpeakerSelect.disabled = !isAudioAllowed;
+        isAudioAllowed ? sound('joined') : sound('left');
+    }
+    
+    function initVideoContainerShow(show = true) {
+        initVideoContainerClass.style.width = show ? '100%' : 'auto';
+    }
+    
+    function checkMedia() {
+        let qs = new URLSearchParams(window.location.search);
+        let audio = qs.get('audio');
+        let video = qs.get('video');
+        if (audio) {
+            audio = audio.toLowerCase();
+            let queryPeerAudio = audio === '1' || audio === 'true';
+            if (queryPeerAudio != null) isAudioAllowed = queryPeerAudio;
+        }
+        if (video) {
+            video = video.toLowerCase();
+            let queryPeerVideo = video === '1' || video === 'true';
+            if (queryPeerVideo != null) isVideoAllowed = queryPeerVideo;
+        }
+        // elemDisplay('tabVideoDevicesBtn', isVideoAllowed);
+        // elemDisplay('tabAudioDevicesBtn', isAudioAllowed);
+    
+        console.log('Direct join', {
+            audio: isAudioAllowed,
+            video: isVideoAllowed,
+        });
+    }
+    
+    // ####################################################
+    // SHARE ROOM
+    // ####################################################
+    
+    async function shareRoom(useNavigator = false) {
+        if (navigator.share && useNavigator) {
+            try {
+                await navigator.share({ url: RoomURL });
+                userLog('info', 'Room Shared successfully', 'top-end');
+            } catch (err) {
+                share();
+            }
+        } else {
+            share();
+        }
+        function share() {
+            sound('open');
+        
+            Swal.fire({
+                background: swalBackground,
+                position: 'center',
+                title: 'Share the room',
+                html: `
+                <div id="qrRoomContainer">
+                    <canvas id="qrRoom"></canvas>
+                </div>
+                <br/>
+                <p style="background:transparent; color:rgb(8, 189, 89);">Join from your mobile device</p>
+                <p style="background:transparent; color:white; font-family: Arial, Helvetica, sans-serif;">No need for apps, simply capture the QR code with your mobile camera Or Invite someone else to join by sending them the following URL</p>
+                <p style="background:transparent; color:rgb(8, 189, 89);">${RoomURL}</p>`,
+                showDenyButton: true,
+                showCancelButton: true,
+                cancelButtonColor: 'red',
+                denyButtonColor: 'green',
+                confirmButtonText: `Copy URL`,
+                denyButtonText: `Email invite`,
+                cancelButtonText: `Close`,
+                showClass: { popup: 'animate__animated animate__fadeInDown' },
+                hideClass: { popup: 'animate__animated animate__fadeOutUp' },
+            }).then((result: { isConfirmed: any; isDenied: any; }) => {
+                if (result.isConfirmed) {
+                    copyRoomURL();
+                } else if (result.isDenied) {
+                    shareRoomByEmail();
+                }
+                // share screen on join
+                if (isScreenAllowed) {
+                    rc.shareScreen();
+                }
+            });
+            makeRoomQR();
+        }
+    }
+    
+    // ####################################################
+    // ROOM UTILITY
+    // ####################################################
+    
+     makeRoomQR() : {
+         qr = new QRious({
+            element: document.getElementById('qrRoom'),
+            value: RoomURL,
+        });
+        qr.set({
+            size: 256,
+        });
+    }
+    
+    function copyRoomURL() {
+        let tmpInput = document.createElement('input');
+        document.body.appendChild(tmpInput);
+        tmpInput.value = RoomURL;
+        tmpInput.select();
+        tmpInput.setSelectionRange(0, 99999); // For mobile devices
+        navigator.clipboard.writeText(tmpInput.value);
+        document.body.removeChild(tmpInput);
+        userLog('info', 'Meeting URL copied to clipboard 👍', 'top-end');
+    }
+    
+    function shareRoomByEmail() {
+        Swal.fire({
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            background: swalBackground,
+            imageUrl: image.email,
+            position: 'center',
+            title: 'Select a Date and Time',
+            html: '<input type="text" id="datetimePicker" class="flatpickr" />',
+            showCancelButton: true,
+            confirmButtonText: 'OK',
+            cancelButtonColor: 'red',
+            showClass: { popup: 'animate__animated animate__fadeInDown' },
+            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
+            preConfirm: () => {
+                const newLine = '%0D%0A%0D%0A';
+                const selectedDateTime = document.getElementById('datetimePicker').value;
+                const roomPassword =
+                   this.isRoomLocked && (this.room_password || rc.RoomPassword)
+                        ? 'Password: ' + (room_password || rc.RoomPassword) + newLine
+                        : '';
+                const email = '';
+                const emailSubject = `Please join our ${Title} Video Chat Meeting`;
+                const emailBody = `The meeting is scheduled at: ${newLine} DateTime: ${selectedDateTime} ${newLine}${roomPassword}Click to join: ${RoomURL} ${newLine}`;
+                document.location = 'mailto:' + email + '?subject=' + emailSubject + '&body=' + emailBody;
+            },
+        });
+        flatpickr('#datetimePicker', {
+            enableTime: true,
+            dateFormat: 'Y-m-d H:i',
+            time_24hr: true,
+        });
+    }
+    
+    // ####################################################
+    // JOIN ROOM
+    // ####################################################
+    
+    function joinRoom(peer_name: any, room_id: string) {
+        if (rc && rc.isConnected()) {
+            console.log('Already connected to a room');
+        } else {
+            console.log('05 ----> join Room ' + room_id);
+            room_Id.innerText = room_id;
+            userName.innerText = peer_name;
+            isUserPresenter.innerText =         rc = new RoomClient(
+                localAudio,
+                remoteAudios,
+                videoMediaContainer,
+                videoPinMediaContainer,
+                window.mediasoupClient,
+                socket,
+                room_id,
+                peer_name,
+                peer_uuid,
+                peer_info,
+                isAudioAllowed,
+                isVideoAllowed,
+                isScreenAllowed,
+                joinRoomWithScreen,
+                isSpeechSynthesisSupported,
+                transcription,
+                roomIsReady,
+            );
+            handleRoomClientEvents();
+            //notify ? shareRoom() : sound('joined');
+        }
+    }
+    
+    function  roomIsReady() {
+        if (rc.isValidEmail(peer_name)) {
+            myProfileAvatar.style.borderRadius = `50px`;
+            myProfileAvatar.setAttribute('src', rc.genGravatar(peer_name));
+        } else {
+            myProfileAvatar.setAttribute('src', rc.genAvatarSvg(peer_name, 64));
+        }
+        BUTTONS.main.exitButton && show(exitButton);
+        BUTTONS.main.shareButton && show(shareButton);
+        BUTTONS.main.hideMeButton && show(hideMeButton);
+        if (BUTTONS.settings.tabRecording) {
+            show(startRecButton);
+        } else {
+            hide(startRecButton);
+            hide(tabRecordingBtn);
+        }
+        BUTTONS.main.chatButton && show(chatButton);
+        BUTTONS.main.raiseHandButton && show(raiseHandButton);
+        BUTTONS.main.emojiRoomButton && show(emojiRoomButton);
+        !BUTTONS.chat.chatSaveButton && hide(chatSaveButton);
+        BUTTONS.chat.chatEmojiButton && show(chatEmojiButton);
+        BUTTONS.chat.chatMarkdownButton && show(chatMarkdownButton);
+    
+        isWebkitSpeechRecognitionSupported && BUTTONS.chat.chatSpeechStartButton
+            ? show(chatSpeechStartButton)
+            : (BUTTONS.chat.chatSpeechStartButton = false);
+    
+        transcription.isSupported() && BUTTONS.main.transcriptionButton
+            ? show(transcriptionButton)
+            : (BUTTONS.main.transcriptionButton = false);
+    
+        show(chatCleanTextButton);
+        show(chatPasteButton);
+        show(chatSendButton);
+        if (DetectRTC.isMobileDevice) {
+            hide(initVideoAudioRefreshButton);
+            hide(refreshVideoDevices);
+            hide(refreshAudioDevices);
+            BUTTONS.main.swapCameraButton && show(swapCameraButton);
+            rc.chatMaximize();
+            hide(chatTogglePin);
+            hide(chatMaxButton);
+            hide(chatMinButton);
+            transcription.maximize();
+            hide(transcriptionTogglePinBtn);
+            hide(transcriptionMaxBtn);
+            hide(transcriptionMinBtn);
+        } else {
+            rc.makeDraggable(emojiPickerContainer, emojiPickerHeader);
+            rc.makeDraggable(chatRoom, chatHeader);
+            rc.makeDraggable(mySettings, mySettingsHeader);
+            rc.makeDraggable(whiteboard, whiteboardHeader);
+            rc.makeDraggable(sendFileDiv, imgShareSend);
+            rc.makeDraggable(receiveFileDiv, imgShareReceive);
+            rc.makeDraggable(lobby, lobbyHeader);
+            rc.makeDraggable(transcriptionRoom, transcriptionHeader);
+            if (navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia) {
+                if (BUTTONS.main.startScreenButton) {
+                    show(startScreenButton);
+                    show(ScreenFpsDiv);
+                }
+            }
+            BUTTONS.chat.chatPinButton && show(chatTogglePin);
+            BUTTONS.chat.chatMaxButton && show(chatMaxButton);
+            BUTTONS.settings.pushToTalk && show(pushToTalkDiv);
+        }
+        if (DetectRTC.browser.name != 'Safari') {
+            document.onfullscreenchange = () => {
+                if (!document.fullscreenElement) rc.isDocumentOnFullScreen = false;
+            };
+            show(fullScreenButton);
+        }
+        BUTTONS.main.whiteboardButton && show(whiteboardButton);
+        BUTTONS.main.settingsButton && show(settingsButton);
+        isAudioAllowed ? show(stopAudioButton) : BUTTONS.main.startAudioButton && show(startAudioButton);
+        isVideoAllowed ? show(stopVideoButton) : BUTTONS.main.startVideoButton && show(startVideoButton);
+        BUTTONS.settings.fileSharing && show(fileShareButton);
+        BUTTONS.settings.lockRoomButton && show(lockRoomButton);
+        BUTTONS.settings.broadcastingButton && show(broadcastingButton);
+        BUTTONS.settings.lobbyButton && show(lobbyButton);
+        BUTTONS.settings.sendEmailInvitation && show(sendEmailInvitation);
+        if (rc.recSyncServerRecording) show(roomRecordingServer);
+        BUTTONS.main.aboutButton && show(aboutButton);
+        if (!DetectRTC.isMobileDevice) show(pinUnpinGridDiv);
+        if (!isSpeechSynthesisSupported) hide(speechMsgDiv);
+        handleButtons();
+        handleSelects();
+        handleInputs();
+        handleChatEmojiPicker();
+        handleRoomEmojiPicker();
+        loadSettingsFromLocalStorage();
+        startSessionTimer();
+        document.body.addEventListener('mousemove', () => {
+            showButtons();
+        });
+        checkButtonsBar();
+        if (room_password) {
+            lockRoomButton.click();
+        }
+    }
+    
+    function elemDisplay(element: string, display: boolean, mode = 'block') {
+        const elem = document.getElementById(element);
+        elem ? (elem.style.display = display ? mode : 'none') : console.error('elemDisplay not found', element);
+    }
+    
+    function hide(elem: HTMLElement | null) {
+        if (!elem.classList.contains('hidden')) elem.classList.toggle('hidden');
+    }
+    
+    function show(elem: HTMLElement | null) {
+        if (elem.classList.contains('hidden')) elem.classList.toggle('hidden');
+    }
+    
+    function disable(elem: { disabled: any; }, disabled: boolean) {
+        elem.disabled = disabled;
+    }
+    
+    function setColor(elem: { style: { color: any; }; }, color: string) {
+        elem.style.color = color;
+    }
+    
+    // ####################################################
+    // SESSION TIMER
+    // ####################################################
+    
+    function startSessionTimer() {
+        sessionTime.style.display = 'inline';
+        let callStartTime = Date.now();
+        setInterval(function printTime() {
+            let callElapsedTime = Date.now() - callStartTime;
+            sessionTime.innerText = getTimeToString(callElapsedTime);
+        }, 1000);
+    }
+    
+    function getTimeToString(time: number) {
+        let diffInHrs = time / 3600000;
+        let hh = Math.floor(diffInHrs);
+        let diffInMin = (diffInHrs - hh) * 60;
+        let mm = Math.floor(diffInMin);
+        let diffInSec = (diffInMin - mm) * 60;
+        let ss = Math.floor(diffInSec);
+        let formattedHH = hh.toString().padStart(2, '0');
+        let formattedMM = mm.toString().padStart(2, '0');
+        let formattedSS = ss.toString().padStart(2, '0');
+        return `${formattedHH}:${formattedMM}:${formattedSS}`;
+    }
+    
+    // ####################################################
+    // RECORDING TIMER
+    // ####################################################
+    
+    function secondsToHms(d: number) {
+        d = Number(d);
+        let h = Math.floor(d / 3600);
+        let m = Math.floor((d % 3600) / 60);
+        let s = Math.floor((d % 3600) % 60);
+        let hDisplay = h > 0 ? h + 'h' : '';
+        let mDisplay = m > 0 ? m + 'm' : '';
+        let sDisplay = s > 0 ? s + 's' : '';
+        return hDisplay + ' ' + mDisplay + ' ' + sDisplay;
+    }
+    
+    function startRecordingTimer() {
+        let recElapsedTime = 0;
+        const recTimer = setInterval(function printTime(this: any) {
+            if (this.rc.isRecording()) {
+                recElapsedTime++;
+                recordingStatus.innerText = secondsToHms(recElapsedTime);
+            }
+        }, 1000);
+    }
+    function stopRecordingTimer(this: any) {
+        clearInterval(this.recTimer);
+    }
+    
+    // ####################################################
+    // HTML BUTTONS
+    // ####################################################
+    
+    function handleButtons() {
+        // Lobby...
+        document.getElementById('lobbyUsers').addEventListener('click', function (event) {
+            switch (event.target.id) {
+                case 'lobbyAcceptAllBtn':
+                    rc.lobbyAcceptAll();
+                    break;
+                case 'lobbyRejectAllBtn':
+                    rc.lobbyRejectAll();
+                    break;
+                default:
+                    break;
             }
         });
-        makeRoomQR();
-    }
-}
-
-// ####################################################
-// ROOM UTILITY
-// ####################################################
-
- makeRoomQR() : {
-     qr = new QRious({
-        element: document.getElementById('qrRoom'),
-        value: RoomURL,
-    });
-    qr.set({
-        size: 256,
-    });
-}
-
-function copyRoomURL() {
-    let tmpInput = document.createElement('input');
-    document.body.appendChild(tmpInput);
-    tmpInput.value = RoomURL;
-    tmpInput.select();
-    tmpInput.setSelectionRange(0, 99999); // For mobile devices
-    navigator.clipboard.writeText(tmpInput.value);
-    document.body.removeChild(tmpInput);
-    userLog('info', 'Meeting URL copied to clipboard 👍', 'top-end');
-}
-
-function shareRoomByEmail() {
-    Swal.fire({
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        background: swalBackground,
-        imageUrl: image.email,
-        position: 'center',
-        title: 'Select a Date and Time',
-        html: '<input type="text" id="datetimePicker" class="flatpickr" />',
-        showCancelButton: true,
-        confirmButtonText: 'OK',
-        cancelButtonColor: 'red',
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        preConfirm: () => {
-            const newLine = '%0D%0A%0D%0A';
-            const selectedDateTime = document.getElementById('datetimePicker').value;
-            const roomPassword =
-                isRoomLocked && (room_password || rc.RoomPassword)
-                    ? 'Password: ' + (room_password || rc.RoomPassword) + newLine
-                    : '';
-            const email = '';
-            const emailSubject = `Please join our ${Title} Video Chat Meeting`;
-            const emailBody = `The meeting is scheduled at: ${newLine} DateTime: ${selectedDateTime} ${newLine}${roomPassword}Click to join: ${RoomURL} ${newLine}`;
-            document.location = 'mailto:' + email + '?subject=' + emailSubject + '&body=' + emailBody;
-        },
-    });
-    flatpickr('#datetimePicker', {
-        enableTime: true,
-        dateFormat: 'Y-m-d H:i',
-        time_24hr: true,
-    });
-}
-
-// ####################################################
-// JOIN ROOM
-// ####################################################
-
-function joinRoom(peer_name: any, room_id: string) {
-    if (rc && rc.isConnected()) {
-        console.log('Already connected to a room');
-    } else {
-        console.log('05 ----> join Room ' + room_id);
-        room_Id.innerText = room_id;
-        userName.innerText = peer_name;
-        isUserPresenter.innerText =         rc = new RoomClient(
-            localAudio,
-            remoteAudios,
-            videoMediaContainer,
-            videoPinMediaContainer,
-            window.mediasoupClient,
-            socket,
-            room_id,
-            peer_name,
-            peer_uuid,
-            peer_info,
-            isAudioAllowed,
-            isVideoAllowed,
-            isScreenAllowed,
-            joinRoomWithScreen,
-            isSpeechSynthesisSupported,
-            transcription,
-            roomIsReady,
-        );
-        handleRoomClientEvents();
-        //notify ? shareRoom() : sound('joined');
-    }
-}
-
-function  roomIsReady() {
-    if (rc.isValidEmail(peer_name)) {
-        myProfileAvatar.style.borderRadius = `50px`;
-        myProfileAvatar.setAttribute('src', rc.genGravatar(peer_name));
-    } else {
-        myProfileAvatar.setAttribute('src', rc.genAvatarSvg(peer_name, 64));
-    }
-    BUTTONS.main.exitButton && show(exitButton);
-    BUTTONS.main.shareButton && show(shareButton);
-    BUTTONS.main.hideMeButton && show(hideMeButton);
-    if (BUTTONS.settings.tabRecording) {
-        show(startRecButton);
-    } else {
-        hide(startRecButton);
-        hide(tabRecordingBtn);
-    }
-    BUTTONS.main.chatButton && show(chatButton);
-    BUTTONS.main.raiseHandButton && show(raiseHandButton);
-    BUTTONS.main.emojiRoomButton && show(emojiRoomButton);
-    !BUTTONS.chat.chatSaveButton && hide(chatSaveButton);
-    BUTTONS.chat.chatEmojiButton && show(chatEmojiButton);
-    BUTTONS.chat.chatMarkdownButton && show(chatMarkdownButton);
-
-    isWebkitSpeechRecognitionSupported && BUTTONS.chat.chatSpeechStartButton
-        ? show(chatSpeechStartButton)
-        : (BUTTONS.chat.chatSpeechStartButton = false);
-
-    transcription.isSupported() && BUTTONS.main.transcriptionButton
-        ? show(transcriptionButton)
-        : (BUTTONS.main.transcriptionButton = false);
-
-    show(chatCleanTextButton);
-    show(chatPasteButton);
-    show(chatSendButton);
-    if (DetectRTC.isMobileDevice) {
-        hide(initVideoAudioRefreshButton);
-        hide(refreshVideoDevices);
-        hide(refreshAudioDevices);
-        BUTTONS.main.swapCameraButton && show(swapCameraButton);
-        rc.chatMaximize();
-        hide(chatTogglePin);
-        hide(chatMaxButton);
-        hide(chatMinButton);
-        transcription.maximize();
-        hide(transcriptionTogglePinBtn);
-        hide(transcriptionMaxBtn);
-        hide(transcriptionMinBtn);
-    } else {
-        rc.makeDraggable(emojiPickerContainer, emojiPickerHeader);
-        rc.makeDraggable(chatRoom, chatHeader);
-        rc.makeDraggable(mySettings, mySettingsHeader);
-        rc.makeDraggable(whiteboard, whiteboardHeader);
-        rc.makeDraggable(sendFileDiv, imgShareSend);
-        rc.makeDraggable(receiveFileDiv, imgShareReceive);
-        rc.makeDraggable(lobby, lobbyHeader);
-        rc.makeDraggable(transcriptionRoom, transcriptionHeader);
-        if (navigator.getDisplayMedia || navigator.mediaDevices.getDisplayMedia) {
-            if (BUTTONS.main.startScreenButton) {
-                show(startScreenButton);
-                show(ScreenFpsDiv);
-            }
-        }
-        BUTTONS.chat.chatPinButton && show(chatTogglePin);
-        BUTTONS.chat.chatMaxButton && show(chatMaxButton);
-        BUTTONS.settings.pushToTalk && show(pushToTalkDiv);
-    }
-    if (DetectRTC.browser.name != 'Safari') {
-        document.onfullscreenchange = () => {
-            if (!document.fullscreenElement) rc.isDocumentOnFullScreen = false;
+        control.onmouseover = () => {
+            isButtonsBarOver = true;
         };
-        show(fullScreenButton);
-    }
-    BUTTONS.main.whiteboardButton && show(whiteboardButton);
-    BUTTONS.main.settingsButton && show(settingsButton);
-    isAudioAllowed ? show(stopAudioButton) : BUTTONS.main.startAudioButton && show(startAudioButton);
-    isVideoAllowed ? show(stopVideoButton) : BUTTONS.main.startVideoButton && show(startVideoButton);
-    BUTTONS.settings.fileSharing && show(fileShareButton);
-    BUTTONS.settings.lockRoomButton && show(lockRoomButton);
-    BUTTONS.settings.broadcastingButton && show(broadcastingButton);
-    BUTTONS.settings.lobbyButton && show(lobbyButton);
-    BUTTONS.settings.sendEmailInvitation && show(sendEmailInvitation);
-    if (rc.recSyncServerRecording) show(roomRecordingServer);
-    BUTTONS.main.aboutButton && show(aboutButton);
-    if (!DetectRTC.isMobileDevice) show(pinUnpinGridDiv);
-    if (!isSpeechSynthesisSupported) hide(speechMsgDiv);
-    handleButtons();
-    handleSelects();
-    handleInputs();
-    handleChatEmojiPicker();
-    handleRoomEmojiPicker();
-    loadSettingsFromLocalStorage();
-    startSessionTimer();
-    document.body.addEventListener('mousemove', () => {
-        showButtons();
-    });
-    checkButtonsBar();
-    if (room_password) {
-        lockRoomButton.click();
-    }
-}
-
-function elemDisplay(element: string, display: boolean, mode = 'block') {
-    const elem = document.getElementById(element);
-    elem ? (elem.style.display = display ? mode : 'none') : console.error('elemDisplay not found', element);
-}
-
-function hide(elem: HTMLElement | null) {
-    if (!elem.classList.contains('hidden')) elem.classList.toggle('hidden');
-}
-
-function show(elem: HTMLElement | null) {
-    if (elem.classList.contains('hidden')) elem.classList.toggle('hidden');
-}
-
-function disable(elem: { disabled: any; }, disabled: boolean) {
-    elem.disabled = disabled;
-}
-
-function setColor(elem: { style: { color: any; }; }, color: string) {
-    elem.style.color = color;
-}
-
-// ####################################################
-// SESSION TIMER
-// ####################################################
-
-function startSessionTimer() {
-    sessionTime.style.display = 'inline';
-    let callStartTime = Date.now();
-    setInterval(function printTime() {
-        let callElapsedTime = Date.now() - callStartTime;
-        sessionTime.innerText = getTimeToString(callElapsedTime);
-    }, 1000);
-}
-
-function getTimeToString(time: number) {
-    let diffInHrs = time / 3600000;
-    let hh = Math.floor(diffInHrs);
-    let diffInMin = (diffInHrs - hh) * 60;
-    let mm = Math.floor(diffInMin);
-    let diffInSec = (diffInMin - mm) * 60;
-    let ss = Math.floor(diffInSec);
-    let formattedHH = hh.toString().padStart(2, '0');
-    let formattedMM = mm.toString().padStart(2, '0');
-    let formattedSS = ss.toString().padStart(2, '0');
-    return `${formattedHH}:${formattedMM}:${formattedSS}`;
-}
-
-// ####################################################
-// RECORDING TIMER
-// ####################################################
-
-function secondsToHms(d: number) {
-    d = Number(d);
-    let h = Math.floor(d / 3600);
-    let m = Math.floor((d % 3600) / 60);
-    let s = Math.floor((d % 3600) % 60);
-    let hDisplay = h > 0 ? h + 'h' : '';
-    let mDisplay = m > 0 ? m + 'm' : '';
-    let sDisplay = s > 0 ? s + 's' : '';
-    return hDisplay + ' ' + mDisplay + ' ' + sDisplay;
-}
-
-function startRecordingTimer() {
-    recElapsedTime = 0;
-    recTimer = setInterval(function printTime() {
-        if (rc.isRecording()) {
-            recElapsedTime++;
-            recordingStatus.innerText = secondsToHms(recElapsedTime);
-        }
-    }, 1000);
-}
-function stopRecordingTimer() {
-    clearInterval(recTimer);
-}
-
-// ####################################################
-// HTML BUTTONS
-// ####################################################
-
-function handleButtons() {
-    // Lobby...
-    document.getElementById('lobbyUsers').addEventListener('click', function (event) {
-        switch (event.target.id) {
-            case 'lobbyAcceptAllBtn':
-                rc.lobbyAcceptAll();
-                break;
-            case 'lobbyRejectAllBtn':
-                rc.lobbyRejectAll();
-                break;
-            default:
-                break;
-        }
-    });
-    control.onmouseover = () => {
-        isButtonsBarOver = true;
-    };
-    control.onmouseout = () => {
-        isButtonsBarOver = false;
-    };
-    exitButton.onclick = () => {
-        rc.exitRoom();
-    };
-    shareButton.onclick = () => {
-        shareRoom(true);
-    };
-    hideMeButton.onclick = () => {
-        isHideMeActive = !isHideMeActive;
-        rc.handleHideMe();
-    };
-    settingsButton.onclick = () => {
-        rc.toggleMySettings();
-    };
-    mySettingsCloseBtn.onclick = () => {
-        rc.toggleMySettings();
-    };
-    tabVideoDevicesBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabVideoDevices');
-    };
-    tabAudioDevicesBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabAudioDevices');
-    };
-    tabRecordingBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabRecording');
-    };
-    tabRoomBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabRoom');
-    };
-    tabVideoShareBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabVideoShare');
-    };
-    tabAspectBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabAspect');
-    };
-    tabModeratorBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabModerator');
-    };
-    tabProfileBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabProfile');
-    };
-    tabStylingBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabStyling');
-    };
-    tabLanguagesBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabLanguages');
-    };
-    tabVideoAIBtn.onclick = (e: any) => {
-        rc.openTab(e, 'tabVideoAI');
-        rc.getAvatarList();
-        rc.getVoiceList();
-    };
-    avatarVideoAIStart.onclick = () => {
-        rc.stopSession();
-        rc.handleVideoAI();
-        rc.toggleMySettings();
-    };
-    switchAvatars.onchange = (e: { currentTarget: { checked: any; }; }) => {
-        showFreeAvatars = e.currentTarget.checked;
-        rc.getAvatarList();
-    };
-    refreshVideoDevices.onclick = async () => {
-        await refreshMyVideoDevices();
-        userLog('info', 'Refreshed video devices', 'top-end');
-    };
-    refreshAudioDevices.onclick = async () => {
-        await refreshMyAudioDevices();
-        userLog('info', 'Refreshed audio devices', 'top-end');
-    };
-    applyAudioOptionsButton.onclick = () => {
-        rc.closeThenProduce(RoomClient.mediaType.audio, microphoneSelect.value);
-    };
-    speakerTestBtn.onclick = () => {
-        sound('ring', true);
-    };
-    roomId.onclick = () => {
-        DetectRTC.isMobileDevice ? shareRoom(true) : copyRoomURL();
-    };
-    roomSendEmail.onclick = () => {
-        shareRoomByEmail();
-    };
-    chatButton.onclick = () => {
-        rc.toggleChat();
-        if (DetectRTC.isMobileDevice) {
+        control.onmouseout = () => {
+            isButtonsBarOver = false;
+        };
+        exitButton.onclick = () => {
+            rc.exitRoom();
+        };
+        shareButton.onclick = () => {
+            shareRoom(true);
+        };
+        hideMeButton.onclick = () => {
+            isHideMeActive = !isHideMeActive;
+            rc.handleHideMe();
+        };
+        settingsButton.onclick = () => {
+            rc.toggleMySettings();
+        };
+        mySettingsCloseBtn.onclick = () => {
+            rc.toggleMySettings();
+        };
+        tabVideoDevicesBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabVideoDevices');
+        };
+        tabAudioDevicesBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabAudioDevices');
+        };
+        tabRecordingBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabRecording');
+        };
+        tabRoomBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabRoom');
+        };
+        tabVideoShareBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabVideoShare');
+        };
+        tabAspectBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabAspect');
+        };
+        tabModeratorBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabModerator');
+        };
+        tabProfileBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabProfile');
+        };
+        tabStylingBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabStyling');
+        };
+        tabLanguagesBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabLanguages');
+        };
+        tabVideoAIBtn.onclick = (e: any) => {
+            rc.openTab(e, 'tabVideoAI');
+            rc.getAvatarList();
+            rc.getVoiceList();
+        };
+        avatarVideoAIStart.onclick = () => {
+            rc.stopSession();
+            rc.handleVideoAI();
+            rc.toggleMySettings();
+        };
+        switchAvatars.onchange = (e: { currentTarget: { checked: any; }; }) => {
+            showFreeAvatars = e.currentTarget.checked;
+            rc.getAvatarList();
+        };
+        refreshVideoDevices.onclick = async () => {
+            await refreshMyVideoDevices();
+            userLog('info', 'Refreshed video devices', 'top-end');
+        };
+        refreshAudioDevices.onclick = async () => {
+            await refreshMyAudioDevices();
+            userLog('info', 'Refreshed audio devices', 'top-end');
+        };
+        applyAudioOptionsButton.onclick = () => {
+            rc.closeThenProduce(RoomClient.mediaType.audio, microphoneSelect.value);
+        };
+        speakerTestBtn.onclick = () => {
+            sound('ring', true);
+        };
+        roomId.onclick = () => {
+            DetectRTC.isMobileDevice ? shareRoom(true) : copyRoomURL();
+        };
+        roomSendEmail.onclick = () => {
+            shareRoomByEmail();
+        };
+        chatButton.onclick = () => {
+            rc.toggleChat();
+            if (DetectRTC.isMobileDevice) {
+                rc.toggleShowParticipants();
+            }
+        };
+        transcriptionButton.onclick = () => {
+            transcription.toggle();
+        };
+        transcriptionCloseBtn.onclick = () => {
+            transcription.toggle();
+        };
+        transcriptionTogglePinBtn.onclick = () => {
+            transcription.togglePinUnpin();
+        };
+        transcriptionMaxBtn.onclick = () => {
+            transcription.maximize();
+        };
+        transcriptionMinBtn.onclick = () => {
+            transcription.minimize();
+        };
+        transcriptionGhostBtn.onclick = () => {
+            transcription.toggleBg();
+        };
+        transcriptionSaveBtn.onclick = () => {
+            transcription.save();
+        };
+        transcriptionCleanBtn.onclick = () => {
+            transcription.delete();
+        };
+        chatHideParticipantsList.onclick = () => {
             rc.toggleShowParticipants();
-        }
-    };
-    transcriptionButton.onclick = () => {
-        transcription.toggle();
-    };
-    transcriptionCloseBtn.onclick = () => {
-        transcription.toggle();
-    };
-    transcriptionTogglePinBtn.onclick = () => {
-        transcription.togglePinUnpin();
-    };
-    transcriptionMaxBtn.onclick = () => {
-        transcription.maximize();
-    };
-    transcriptionMinBtn.onclick = () => {
-        transcription.minimize();
-    };
-    transcriptionGhostBtn.onclick = () => {
-        transcription.toggleBg();
-    };
-    transcriptionSaveBtn.onclick = () => {
-        transcription.save();
-    };
-    transcriptionCleanBtn.onclick = () => {
-        transcription.delete();
-    };
-    chatHideParticipantsList.onclick = () => {
-        rc.toggleShowParticipants();
-    };
-    chatShowParticipantsList.onclick = () => {
-        rc.toggleShowParticipants();
-    };
-    chatShareRoomBtn.onclick = () => {
-        shareRoom(true);
-    };
-    chatGhostButton.onclick = () => {
-        rc.chatToggleBg();
-    };
-    chatCleanButton.onclick = () => {
-        rc.chatClean();
-    };
-    chatSaveButton.onclick = () => {
-        rc.chatSave();
-    };
-    chatCloseButton.onclick = () => {
-        rc.toggleChat();
-    };
-    chatTogglePin.onclick = () => {
-        rc.toggleChatPin();
-    };
-    chatMaxButton.onclick = () => {
-        rc.chatMaximize();
-    };
-    chatMinButton.onclick = () => {
-        rc.chatMinimize();
-    };
-    chatCleanTextButton.onclick = () => {
-        rc.cleanMessage();
-    };
-    chatPasteButton.onclick = () => {
-        rc.pasteMessage();
-    };
-    chatSendButton.onclick = () => {
-        rc.sendMessage();
-    };
-    chatEmojiButton.onclick = () => {
-        rc.toggleChatEmoji();
-    };
-    chatMarkdownButton.onclick = () => {
-        isChatMarkdownOn = !isChatMarkdownOn;
-        setColor(chatMarkdownButton, isChatMarkdownOn ? 'lime' : 'white');
-    };
-    chatSpeechStartButton.onclick = () => {
-        startSpeech();
-    };
-    chatSpeechStopButton.onclick = () => {
-        stopSpeech();
-    };
-    transcriptionSpeechStart.onclick = () => {
-        transcription.start();
-    };
-    transcriptionSpeechStop.onclick = () => {
-        transcription.stop();
-    };
-    fullScreenButton.onclick = () => {
-        rc.toggleFullScreen();
-    };
-    recordingImage.onclick = () => {
-        isRecording ? stopRecButton.click() : startRecButton.click();
-    };
-    startRecButton.onclick = () => {
-        rc.startRecording();
-    };
-    stopRecButton.onclick = () => {
-        rc.stopRecording();
-    };
-    pauseRecButton.onclick = () => {
-        rc.pauseRecording();
-    };
-    resumeRecButton.onclick = () => {
-        rc.resumeRecording();
-    };
-    swapCameraButton.onclick = () => {
-        if (isHideMeActive) rc.handleHideMe();
-        rc.closeThenProduce(RoomClient.mediaType.video, null, true);
-    };
-    raiseHandButton.onclick = () => {
-        rc.updatePeerInfo(peer_name, socket.id, 'hand', true);
-    };
-    lowerHandButton.onclick = () => {
-        rc.updatePeerInfo(peer_name, socket.id, 'hand', false);
-    };
-    startAudioButton.onclick = async () => {
-        const moderator = rc.getModerator();
-        if (moderator.audio_cant_unmute) {
-            return userLog('warning', 'The moderator does not allow you to unmute', 'top-end', 6000);
-        }
-        if (isPushToTalkActive) return;
-        setAudioButtonsDisabled(true);
-        if (!isEnumerateAudioDevices) await initEnumerateAudioDevices();
-
-        const producerExist = rc.producerExist(RoomClient.mediaType.audio);
-        console.log('START AUDIO producerExist --->', producerExist);
-
-        producerExist
-            ? await rc.resumeProducer(RoomClient.mediaType.audio)
-            : await rc.produce(RoomClient.mediaType.audio, microphoneSelect.value);
-
-        rc.updatePeerInfo(peer_name, socket.id, 'audio', true);
-    };
-    stopAudioButton.onclick = async () => {
-        if (isPushToTalkActive) return;
-        setAudioButtonsDisabled(true);
-
-        const producerExist = rc.producerExist(RoomClient.mediaType.audio);
-        console.log('STOP AUDIO producerExist --->', producerExist);
-
-        producerExist
-            ? await rc.pauseProducer(RoomClient.mediaType.audio)
-            : await rc.closeProducer(RoomClient.mediaType.audio);
-
-        rc.updatePeerInfo(peer_name, socket.id, 'audio', false);
-    };
-    startVideoButton.onclick = async () => {
-        const moderator = rc.getModerator();
-        if (moderator.video_cant_unhide) {
-            return userLog('warning', 'The moderator does not allow you to unhide', 'top-end', 6000);
-        }
-        setVideoButtonsDisabled(true);
-        if (!isEnumerateVideoDevices) await initEnumerateVideoDevices();
-        await rc.produce(RoomClient.mediaType.video, videoSelect.value);
-        // await rc.resumeProducer(RoomClient.mediaType.video);
-    };
-    stopVideoButton.onclick = () => {
-        setVideoButtonsDisabled(true);
-        rc.closeProducer(RoomClient.mediaType.video);
-        // await rc.pauseProducer(RoomClient.mediaType.video);
-    };
-    startScreenButton.onclick = async () => {
-        const moderator = rc.getModerator();
-        if (moderator.screen_cant_share) {
-            return userLog('warning', 'The moderator does not allow you to share the screen', 'top-end', 6000);
-        }
-        await rc.produce(RoomClient.mediaType.screen);
-    };
-    stopScreenButton.onclick = () => {
-        rc.closeProducer(RoomClient.mediaType.screen);
-    };
-    fileShareButton.onclick = () => {
-        rc.selectFileToShare(socket.id, true);
-    };
-    videoShareButton.onclick = () => {
-        rc.shareVideo('all');
-    };
-    videoCloseBtn.onclick = () => {
-        rc.closeVideo(true);
-    };
-    sendAbortBtn.onclick = () => {
+        };
+        chatShowParticipantsList.onclick = () => {
+            rc.toggleShowParticipants();
+        };
+        chatShareRoomBtn.onclick = () => {
+            shareRoom(true);
+        };
+        chatGhostButton.onclick = () => {
+            rc.chatToggleBg();
+        };
+        chatCleanButton.onclick = () => {
+            rc.chatClean();
+        };
+        chatSaveButton.onclick = () => {
+            rc.chatSave();
+        };
+        chatCloseButton.onclick = () => {
+            rc.toggleChat();
+        };
+        chatTogglePin.onclick = () => {
+            rc.toggleChatPin();
+        };
+        chatMaxButton.onclick = () => {
+            rc.chatMaximize();
+        };
+        chatMinButton.onclick = () => {
+            rc.chatMinimize();
+        };
+        chatCleanTextButton.onclick = () => {
+            rc.cleanMessage();
+        };
+        chatPasteButton.onclick = () => {
+            rc.pasteMessage();
+        };
+        chatSendButton.onclick = () => {
+            rc.sendMessage();
+        };
+        chatEmojiButton.onclick = () => {
+            rc.toggleChatEmoji();
+        };
+        chatMarkdownButton.onclick = () => {
+            isChatMarkdownOn = !isChatMarkdownOn;
+            setColor(chatMarkdownButton, isChatMarkdownOn ? 'lime' : 'white');
+        };
+        chatSpeechStartButton.onclick = () => {
+            startSpeech();
+        };
+        chatSpeechStopButton.onclick = () => {
+            stopSpeech();
+        };
+        transcriptionSpeechStart.onclick = () => {
+            transcription.start();
+        };
+        transcriptionSpeechStop.onclick = () => {
+            transcription.stop();
+        };
+        fullScreenButton.onclick = () => {
+            rc.toggleFullScreen();
+        };
+        recordingImage.onclick = () => {
+            isRecording ? stopRecButton.click() : startRecButton.click();
+        };
+        startRecButton.onclick = () => {
+            rc.startRecording();
+        };
+        stopRecButton.onclick = () => {
+            rc.stopRecording();
+        };
+        pauseRecButton.onclick = () => {
+            rc.pauseRecording();
+        };
+        resumeRecButton.onclick = () => {
+            rc.resumeRecording();
+        };
+        swapCameraButton.onclick = () => {
+            if (isHideMeActive) rc.handleHideMe();
+            rc.closeThenProduce(RoomClient.mediaType.video, null, true);
+        };
+        raiseHandButton.onclick = () => {
+            rc.updatePeerInfo(peer_name, socket.id, 'hand', true);
+        };
+        lowerHandButton.onclick = () => {
+            rc.updatePeerInfo(peer_name, socket.id, 'hand', false);
+        };
+        startAudioButton.onclick = async () => {
+            const moderator = rc.getModerator();
+            if (moderator.audio_cant_unmute) {
+                return userLog('warning', 'The moderator does not allow you to unmute', 'top-end', 6000);
+            }
+            if (isPushToTalkActive) return;
+            setAudioButtonsDisabled(true);
+            if (!isEnumerateAudioDevices) await initEnumerateAudioDevices();
+        
+            const producerExist = rc.producerExist(RoomClient.mediaType.audio);
+            console.log('START AUDIO producerExist --->', producerExist);
+        
+            producerExist
+                ? await rc.resumeProducer(RoomClient.mediaType.audio)
+                : await rc.produce(RoomClient.mediaType.audio, microphoneSelect.value);
+        
+            rc.updatePeerInfo(peer_name, socket.id, 'audio', true);
+        };
+        stopAudioButton.onclick = async () => {
+            if (isPushToTalkActive) return;
+            setAudioButtonsDisabled(true);
+        
+            const producerExist = rc.producerExist(RoomClient.mediaType.audio);
+            console.log('STOP AUDIO producerExist --->', producerExist);
+        
+            producerExist
+                ? await rc.pauseProducer(RoomClient.mediaType.audio)
+                : await rc.closeProducer(RoomClient.mediaType.audio);
+        
+            rc.updatePeerInfo(peer_name, socket.id, 'audio', false);
+        };
+        startVideoButton.onclick = async () => {
+            const moderator = rc.getModerator();
+            if (moderator.video_cant_unhide) {
+                return userLog('warning', 'The moderator does not allow you to unhide', 'top-end', 6000);
+            }
+            setVideoButtonsDisabled(true);
+            if (!isEnumerateVideoDevices) await initEnumerateVideoDevices();
+            await rc.produce(RoomClient.mediaType.video, videoSelect.value);
+            // await rc.resumeProducer(RoomClient.mediaType.video);
+        };
+        stopVideoButton.onclick = () => {
+            setVideoButtonsDisabled(true);
+            rc.closeProducer(RoomClient.mediaType.video);
+            // await rc.pauseProducer(RoomClient.mediaType.video);
+        };
+        startScreenButton.onclick = async () => {
+            const moderator = rc.getModerator();
+            if (moderator.screen_cant_share) {
+                return userLog('warning', 'The moderator does not allow you to share the screen', 'top-end', 6000);
+            }
+            await rc.produce(RoomClient.mediaType.screen);
+        };
+        stopScreenButton.onclick = () => {
+            rc.closeProducer(RoomClient.mediaType.screen);
+        };
+        fileShareButton.onclick = () => {
+            rc.selectFileToShare(socket.id, true);
+        };
+        videoShareButton.onclick = () => {
+            rc.shareVideo('all');
+        };
+        videoCloseBtn.onclick = () => {
+            rc.closeVideo(true);
+        };
+        sendAbortBtn.onclick = () => {
         rc.abortFileTransfer();
     };
     receiveHideBtn.onclick = () => {
@@ -2199,7 +2188,7 @@ function handleButtons() {
     // restartICE.onclick = async () => {
     //     await rc.restartIce();
     // };
-}
+ }
 
 // ####################################################
 // HANDLE INIT USER
@@ -4329,7 +4318,7 @@ function handleAspectRatio() {
     if (participantsCount > 1) {
         adaptAspectRatio(videoMediaContainer.childElementCount);
     } else {
-        resizeVideoMedia();
+        VideogridService.resizeVideoMedia();
     }
 }
 
@@ -4435,7 +4424,7 @@ function showAbout(this: any) {
         hideClass: { popup: 'animate__animated animate__fadeOutUp' },
     });
 
-
+}
 
 
 
@@ -5785,7 +5774,7 @@ function showAbout(this: any) {
         hideMeIcon.className = isHideMeActive ? html.hideMeOn : html.hideMeOff;
         hideMeIcon.style.color = isHideMeActive ? 'red' : 'white';
         isHideMeActive ? this.sound('left') : this.sound('joined');
-        resizeVideoMedia();
+       VideogridService.resizeVideoMedia();
     }
 
     function  producerExist(this: any, type: any) {
@@ -11302,4 +11291,4 @@ function showAbout(this: any) {
     sleep(ms); {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
-} ;// End
+// End

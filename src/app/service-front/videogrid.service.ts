@@ -4,6 +4,9 @@ import { Injectable } from '@angular/core';
   providedIn: 'root',
 })
 export class VideogridService {
+  static resizeVideoMedia() {
+      throw new Error('Method not implemented.');
+  }
   customRatio = true;
   ratios = ['0:0', '4:3', '16:9', '1:1', '1:2'];
   aspect = 2;
